@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="hu" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Koreai SRS Szótanuló &amp; Kikérdező (Google Drive Sync)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Google Identity Services (GIS) SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface-2: #eef2f9;
+      --border: #dce3f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --korean-accent: #4338ca;
+      --success: #16a34a;
+      --success-bg: rgba(22, 163, 74, 0.14);
+      --danger: #dc2626;
+      --danger-bg: rgba(220, 38, 38, 0.14);
+      --warning: #d97706;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    html.dark {
+      --bg: #0b0f19;
+      --surface: #131a2a;
+      --surface-2: #1c253b;
+      --border: #2a3654;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --korean-accent: #38bdf8;
+      --success: #22c55e;
+      --success-bg: rgba(34, 197, 94, 0.18);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.18);
+      --warning: #f59e0b;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+      min-height: 100vh;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .kr {
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 10px 14px 40px;
+    }
+
+    /* Mobile-first Viewport Quiz Area so question + 2x2 options + example + Next button fit on 1 phone screen */
+    .quiz-viewport {
+      min-height: calc(100dvh - 16px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* Top Header Bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 12px;
+      box-shadow: var(--shadow);
+      gap: 6px;
+    }
+
+    .day-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .day-pill {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .phase-pill {
+      background: var(--surface-2);
+      color: var(--korean-accent);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .icon-btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px 9px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.96);
+    }
+
+    .icon-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .icon-btn.drive-ok {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .icon-btn.drive-warn {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+
+    /* Progress bar inside session */
+    .session-bar-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .session-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--korean-accent));
+      border-radius: 999px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* Question Card */
+    .question-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px 16px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .q-hint {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hu-word {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text);
+      margin: 2px 0;
+    }
+
+    .streak-dots {
+      display: inline-flex;
+      gap: 5px;
+      margin-top: 4px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+
+    .dot.filled {
+      background: var(--success);
+      border-color: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    /* 2x2 Options Grid with 3x Korean Font Size & Highlighted Color */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .option-btn {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 8px;
+      min-height: 82px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease;
+      user-select: none;
+    }
+
+    .option-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Korean words in 3x relative visual prominence with highlighted accent color */
+    .option-kr-main {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: clamp(1.45rem, 5.2vw, 2.1rem);
+      font-weight: 900;
+      color: var(--korean-accent);
+      line-height: 1.15;
+      word-break: keep-all;
+    }
+
+    .option-kr-sub {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: clamp(1.05rem, 3.6vw, 1.35rem);
+      font-weight: 700;
+      color: var(--korean-accent);
+      opacity: 0.88;
+      margin-top: 2px;
+    }
+
+    .option-btn.correct {
+      border-color: var(--success) !important;
+      background-color: var(--success-bg) !important;
+    }
+
+    .option-btn.correct .option-kr-main,
+    .option-btn.correct .option-kr-sub {
+      color: var(--success) !important;
+    }
+
+    .option-btn.wrong {
+      border-color: var(--danger) !important;
+      background-color: var(--danger-bg) !important;
+    }
+
+    .option-btn.wrong .option-kr-main,
+    .option-btn.wrong .option-kr-sub {
+      color: var(--danger) !important;
+    }
+
+    /* Example Sentence Box (Korean 2x size, Hungarian 1x size below) */
+    .example-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.15s ease;
+      min-height: 76px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .example-box.hidden-placeholder {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .example-kr {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: clamp(1.25rem, 4.4vw, 1.65rem); /* 2x relative to 1x Hungarian */
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .example-hu {
+      font-size: 0.88rem; /* 1x base size */
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .tts-badge {
+      font-size: 0.7rem;
+      color: var(--korean-accent);
+      font-weight: 700;
+    }
+
+    /* Next Button */
+    .next-btn {
+      width: 100%;
+      padding: 13px 18px;
+      border-radius: 14px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
+      transition: background-color 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+    }
+
+    .next-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .next-btn:not(:disabled):active {
+      transform: scale(0.98);
+    }
+
+    /* Dashboard Section (Below the fold on mobile) */
+    .dashboard-section {
+      margin-top: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-label {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .stat-sub {
+      font-size: 0.72rem;
+      color: var(--korean-accent);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .panel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-card h3 {
+      font-size: 0.9rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hard-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface-2);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    .hard-item-kr {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-weight: 700;
+      color: var(--korean-accent);
+      font-size: 1rem;
+    }
+
+    .file-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action-btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .action-btn:hover {
+      border-color: var(--primary);
+    }
+
+    .action-btn.primary-outline {
+      border-color: var(--primary);
+      color: var(--korean-accent);
+    }
+
+    .drive-status-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .drive-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drive-status-label {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .drive-status-val {
+      font-weight: 700;
+      color: var(--text);
+      text-align: right;
+    }
+
+    .badge-ok {
+      color: var(--success);
+    }
+
+    .badge-err {
+      color: var(--danger);
+    }
+
+    .badge-pending {
+      color: var(--warning);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--primary);
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      z-index: 999;
+      opacity: 0;
+      transition: all 0.25s ease;
+      max-width: 92vw;
+      text-align: center;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- MOBILE 1-SCREEN QUIZ VIEWPORT -->
+    <div class="quiz-viewport">
+      <!-- Top Bar -->
+      <div class="topbar">
+        <div class="day-badge">
+          <span class="day-pill" id="dayBadge">1. NAP</span>
+          <span class="phase-pill" id="phaseBadge">1. Fázis: Napi 10 új</span>
+        </div>
+        <div class="top-controls">
+          <button class="icon-btn drive-warn" id="googleAuthBtn" title="Google Drive bejelentkezés / szinkronizálás">
+            ☁️ <span id="googleAuthLabel">Drive Belépés</span>
+          </button>
+          <button class="icon-btn" id="voiceToggleBtn" title="Csak koreai hang / Magyar + Koreai hang">
+            🔊 <span id="voiceToggleLabel">HU+KR</span>
+          </button>
+          <button class="icon-btn" id="themeToggleBtn" title="Sötét / Világos mód">
+            🌙
+          </button>
+        </div>
+      </div>
+
+      <!-- Session Progress -->
+      <div class="session-bar-wrap">
+        <div class="session-meta">
+          <span id="queueInfo">Napi cél: 0 / 10 szó rögzítve</span>
+          <span id="scoreInfo">Ma: ✅ 0 | ❌ 0</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="sessionProgressFill"></div>
+        </div>
+      </div>
+
+      <!-- Question Card (Hungarian prompt + TTS replay on click) -->
+      <div class="question-card" id="questionCard" title="Kattints a felolvasáshoz">
+        <div class="q-hint">
+          <span>🔊 Válaszd ki a koreai megfelelőt</span>
+          <span id="wordRankTag">#1</span>
+        </div>
+        <div class="hu-word" id="huPrompt">Betöltés...</div>
+        <div class="streak-dots" id="streakDots" title="Hányszor kell még egymás után eltalálni"></div>
+      </div>
+
+      <!-- 2x2 Answer Grid -->
+      <div class="options-grid" id="optionsGrid"></div>
+
+      <!-- Example Sentence Card (Korean 2x + Hungarian 1x) -->
+      <div class="example-box hidden-placeholder" id="exampleBox" title="Kattints a mondat újbóli felolvasásához">
+        <div class="example-kr kr" id="exampleKr">Válassz egy választ a példamondathoz...</div>
+        <div class="example-hu" id="exampleHu">A válaszadás után itt jelenik meg a kontextus és a kiejtés.</div>
+        <div class="tts-badge" id="ttsHintBadge" style="display:none;">🔊 Kattints bármelyik koreai szóra vagy a mondatra a meghallgatáshoz</div>
+      </div>
+
+      <!-- Next Button -->
+      <button class="next-btn" id="nextBtn" disabled>Tovább a következő szóra →</button>
+    </div>
+
+    <!-- DASHBOARD & FILE SYNC (Scroll down on mobile) -->
+    <div class="dashboard-section">
+      <div class="section-title">
+        <span>📊 Tanulási Statisztika &amp; SRS Dashboard</span>
+        <button class="icon-btn" id="advanceDayBtn" title="Következő tanulási nap indítása (következő 10 szó)">
+          ⏭️ Következő nap
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Tanulási napok száma</div>
+          <div class="stat-value" id="statDays">1 nap</div>
+          <div class="stat-sub" id="statDayScope">Aktuális blokk: 1–10. szó</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Kikérdezett szavak</div>
+          <div class="stat-value" id="statAsked">0 / 0</div>
+          <div class="stat-sub">Ma / Összesen</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Teljesen megtanult szavak</div>
+          <div class="stat-value" id="statMastered">0 db</div>
+          <div class="stat-sub" id="statTotalVocab">250 beépített szóból</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tanulási hatékonyság</div>
+          <div class="stat-value" id="statEfficiency">0%</div>
+          <div class="stat-sub" id="statAvgSpeed">Átl. válaszidő: - mp</div>
+        </div>
+      </div>
+
+      <!-- Most Repeated / Hardest Words -->
+      <div class="panel-card">
+        <h3>🔥 Legtöbbet ismételt / legnehezebb szavak</h3>
+        <div class="hard-list" id="hardWordsList">
+          <div style="font-size:0.82rem; color:var(--text-muted);">Még nincs elég adat. Kezdd el a gyakorlást!</div>
+        </div>
+      </div>
+
+      <!-- Google Drive REST API v3 & Local File Sync -->
+      <div class="panel-card">
+        <h3>
+          <span>☁️ Google Drive Szinkronizáció &amp; Adatfájlok</span>
+          <button class="icon-btn" id="reloadDriveBtn" title="Fájlok újbóli betöltése a Google Drive-ról">🔄 Betöltés Drive-ról</button>
+        </h3>
+
+        <div class="drive-status-box">
+          <div class="drive-status-row">
+            <span class="drive-status-label">Felhasználó:</span>
+            <span class="drive-status-val" id="driveUserStatus">tothpeterzoltan@gmail.com (Nincs belépve)</span>
+          </div>
+          <div class="drive-status-row">
+            <span class="drive-status-label">Szinkron állapot:</span>
+            <span class="drive-status-val badge-pending" id="driveSyncState">Várakozás Google hitelesítésre...</span>
+          </div>
+          <div class="drive-status-row">
+            <span class="drive-status-label">Szókincsfájl (CSV) utolsó módosítása:</span>
+            <span class="drive-status-val" id="vocabModifiedTime">-</span>
+          </div>
+          <div class="drive-status-row">
+            <span class="drive-status-label">Státuszfájl (JSON) utolsó módosítása:</span>
+            <span class="drive-status-val" id="statusModifiedTime">-</span>
+          </div>
+        </div>
+
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+          A program <strong>minden 10. válasz után automatikusan</strong> felülírja mindkét fájlt a Google Drive-on. A lenti gombokkal bármikor manuálisan is elindíthatod a mentést (helyi biztonsági másolattal együtt).
+        </p>
+
+        <div class="file-actions">
+          <button class="action-btn primary-outline" id="exportCsvBtn">☁️ Szófájl mentése (Drive + CSV)</button>
+          <label class="action-btn primary-outline" for="importCsvInput">⬆️ Helyi CSV betöltése</label>
+          <input type="file" id="importCsvInput" accept=".csv,.txt" />
+
+          <button class="action-btn" id="exportStatusBtn">☁️ Státusz mentése (Drive + JSON)</button>
+          <label class="action-btn" for="importStatusInput">⬆️ Helyi JSON betöltése</label>
+          <input type="file" id="importStatusInput" accept=".json" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Mentve!</div>
+
+  <script>
+    // =========================================================================
+    // 0. GOOGLE IDENTITY SERVICES (GIS) & GOOGLE DRIVE REST API v3 CONFIG
+    // =========================================================================
+    const GOOGLE_CLIENT_ID = "318536815260-mc17vtlb9q456vucqk6gbkvk13rkli8q.apps.googleusercontent.com";
+    const TARGET_USER_EMAIL = "tothpeterzoltan@gmail.com";
+    const DRIVE_STATUS_FILE_ID = "1lTeu5d3dyGGsJlvnk7sy8atFDT4Oqf4f";
+    const DRIVE_VOCAB_FILE_ID = "1TTaFkW2-1om6LmYvMyKY64rlrGmtirkF";
+    const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive";
+
+    let tokenClient = null;
+    let googleAccessToken = null;
+    let tokenExpiresAt = 0;
+    let pendingActionAfterAuth = null;
+    let answersSinceLastDriveSync = 0;
+    const AUTO_SYNC_INTERVAL = 10;
+
+    function formatHuDateTime(isoString) {
+      if (!isoString) return "Ismeretlen";
+      try {
+        const d = new Date(isoString);
+        return d.toLocaleString("hu-HU", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+      } catch (e) {
+        return isoString;
+      }
+    }
+
+    function updateDriveStatusUI(stateText, stateClass = "badge-pending") {
+      const el = document.getElementById("driveSyncState");
+      el.textContent = stateText;
+      el.className = `drive-status-val ${stateClass}`;
+    }
+
+    function initGoogleIdentityServices() {
+      if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
+        // Retry briefly until GIS script finishes loading
+        setTimeout(initGoogleIdentityServices, 300);
+        return;
+      }
+
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: DRIVE_SCOPES,
+        hint: TARGET_USER_EMAIL,
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            googleAccessToken = tokenResponse.access_token;
+            tokenExpiresAt = Date.now() + (Number(tokenResponse.expires_in || 3500) * 1000);
+
+            const authBtn = document.getElementById("googleAuthBtn");
+            authBtn.classList.remove("drive-warn");
+            authBtn.classList.add("drive-ok");
+            document.getElementById("googleAuthLabel").textContent = "Drive Aktív";
+            document.getElementById("driveUserStatus").textContent = `${TARGET_USER_EMAIL} (Hitelesítve ✅)`;
+
+            if (pendingActionAfterAuth) {
+              const action = pendingActionAfterAuth;
+              pendingActionAfterAuth = null;
+              await action();
+            } else {
+              await loadAllFromGoogleDrive();
+            }
+          } else {
+            updateDriveStatusUI("❌ Sikertelen Google hitelesítés", "badge-err");
+            showToast("❌ Sikertelen Google belépés.");
+          }
+        },
+        error_callback: (err) => {
+          console.error("GIS Error:", err);
+          updateDriveStatusUI(`❌ Hitelesítési hiba (${err.type || "popup"})`, "badge-err");
+          showToast("⚠️ Kattints a 'Drive Belépés' gombra a felugró ablak engedélyezéséhez.");
+        }
+      });
+
+      // Attempt automatic silent/prompt authentication upon opening
+      requestGoogleAuth(false);
+    }
+
+    function requestGoogleAuth(interactive = true, afterCallback = null) {
+      if (!tokenClient) {
+        showToast("⏳ Google szolgáltatás betöltése...");
+        return;
+      }
+      if (afterCallback) {
+        pendingActionAfterAuth = afterCallback;
+      }
+      try {
+        tokenClient.requestAccessToken({
+          prompt: interactive ? "consent" : "",
+          login_hint: TARGET_USER_EMAIL
+        });
+      } catch (e) {
+        console.warn("Auto auth blocked, awaiting user click:", e);
+        updateDriveStatusUI("Kattints a 'Drive Belépés' gombra a szinkronizáláshoz", "badge-pending");
+      }
+    }
+
+    function hasValidToken() {
+      return googleAccessToken && Date.now() < tokenExpiresAt - 30000;
+    }
+
+    async function fetchDriveFileMetadata(fileId) {
+      const url = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,modifiedTime,mimeType`;
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${googleAccessToken}` }
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Meta HTTP ${res.status}: ${errBody}`);
+      }
+      return await res.json();
+    }
+
+    async function fetchDriveFileMedia(fileId) {
+      const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${googleAccessToken}` }
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Media HTTP ${res.status}: ${errBody}`);
+      }
+      return await res.text();
+    }
+
+    async function loadAllFromGoogleDrive() {
+      if (!hasValidToken()) {
+        requestGoogleAuth(true, loadAllFromGoogleDrive);
+        return;
+      }
+
+      updateDriveStatusUI("⏳ Fájlok letöltése a Google Drive-ról...", "badge-pending");
+      let vocabLoadedOk = false;
+      let statusLoadedOk = false;
+
+      // 1. Load Vocabulary CSV from Google Drive
+      try {
+        const [vocabMeta, vocabCsvText] = await Promise.all([
+          fetchDriveFileMetadata(DRIVE_VOCAB_FILE_ID),
+          fetchDriveFileMedia(DRIVE_VOCAB_FILE_ID)
+        ]);
+        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(vocabMeta.modifiedTime);
+
+        const parsed = parseSemicolonCSV(vocabCsvText);
+        if (parsed.length > 0) {
+          vocabList = parsed;
+          vocabLoadedOk = true;
+        }
+      } catch (err) {
+        console.error("Vocab Drive load error:", err);
+        document.getElementById("vocabModifiedTime").textContent = "❌ Betöltési hiba";
+      }
+
+      // 2. Load Status JSON from Google Drive
+      try {
+        const [statusMeta, statusJsonText] = await Promise.all([
+          fetchDriveFileMetadata(DRIVE_STATUS_FILE_ID),
+          fetchDriveFileMedia(DRIVE_STATUS_FILE_ID)
+        ]);
+        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(statusMeta.modifiedTime);
+
+        if (statusJsonText && statusJsonText.trim().length > 2) {
+          const parsedStatus = JSON.parse(statusJsonText);
+          appStatus = {
+            ...appStatus,
+            ...parsedStatus,
+            settings: { ...appStatus.settings, ...(parsedStatus.settings || {}) }
+          };
+          statusLoadedOk = true;
+        }
+      } catch (err) {
+        console.error("Status Drive load error:", err);
+        document.getElementById("statusModifiedTime").textContent = "❌ Betöltési hiba / üres fájl";
+      }
+
+      checkCalendarDayRollover();
+      applyTheme();
+      updateVoiceBtnUI();
+      saveStateLocal();
+
+      answersSinceLastDriveSync += 1;
+      if (answersSinceLastDriveSync >= AUTO_SYNC_INTERVAL) {
+        answersSinceLastDriveSync = 0;
+        silentAutoSyncBothToDrive();
+      }
+      renderDashboard();
+      renderQuestion();
+
+      if (vocabLoadedOk && statusLoadedOk) {
+        updateDriveStatusUI(`✅ Sikeres betöltés (${vocabList.length} szó + státusz)`, "badge-ok");
+        showToast(`✅ Google Drive betöltve! (${vocabList.length} szó)`);
+      } else if (vocabLoadedOk) {
+        updateDriveStatusUI(`⚠️ Szókincs betöltve (${vocabList.length} szó), státusz alapértelmezett`, "badge-pending");
+        showToast(`⚠️ Szókincs betöltve, a Drive státuszfájl még üres volt.`);
+      } else {
+        updateDriveStatusUI("❌ Nem sikerült a Drive fájlok betöltése", "badge-err");
+        showToast("❌ Hiba a Google Drive fájlok elérésekor. Ellenőrizd a jogosultságot!");
+      }
+    }
+
+    async function overwriteDriveFile(fileId, contentString, mimeType) {
+      const url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,name,modifiedTime`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${googleAccessToken}`,
+          "Content-Type": mimeType
+        },
+        body: contentString
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Upload HTTP ${res.status}: ${errText}`);
+      }
+      return await res.json();
+    }
+
+    async function silentAutoSyncBothToDrive() {
+      if (!hasValidToken()) {
+        updateDriveStatusUI("⚠️ Auto-mentés várakozik (nincs aktív Drive token)", "badge-pending");
+        return;
+      }
+
+      updateDriveStatusUI("⏳ Automatikus Drive mentés (10 válasz után)...", "badge-pending");
+      try {
+        const csvContent = buildVocabCSVString();
+        const jsonContent = JSON.stringify(appStatus, null, 2);
+
+        const [vocabMeta, statusMeta] = await Promise.all([
+          overwriteDriveFile(DRIVE_VOCAB_FILE_ID, csvContent, "text/csv; charset=utf-8"),
+          overwriteDriveFile(DRIVE_STATUS_FILE_ID, jsonContent, "application/json; charset=utf-8")
+        ]);
+
+        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(vocabMeta.modifiedTime);
+        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(statusMeta.modifiedTime);
+        updateDriveStatusUI(`✅ Automatikusan szinkronizálva (${formatHuDateTime(statusMeta.modifiedTime)})`, "badge-ok");
+        showToast("☁️ Automatikus mentés a Google Drive-ra kész (10 válasz)!");
+      } catch (err) {
+        console.error("Silent auto-sync error:", err);
+        updateDriveStatusUI("❌ Automatikus Drive mentés sikertelen", "badge-err");
+      }
+    }
+
+    // =========================================================================
+    // 1. EMBEDDED FALLBACK VOCABULARY (Used only before Drive loads)
+    // =========================================================================
+    const EMBEDDED_VOCAB = [{"rank": 1, "korean": "하다 / 해요", "hungarian": "csinálni, tenni", "example_kr": "오늘 뭐 해요?", "example_hu": "Mit csinálsz ma?", "root": "하"}, {"rank": 2, "korean": "있다 / 있어요", "hungarian": "lenni (van), létezni", "example_kr": "시간이 있어요?", "example_hu": "Van időd?", "root": "있"}, {"rank": 3, "korean": "없다 / 없어요", "hungarian": "nincs, nem létezni", "example_kr": "돈이 없어요.", "example_hu": "Nincs pénzem.", "root": "없"}, {"rank": 4, "korean": "가다 / 가요", "hungarian": "menni", "example_kr": "집에 가요.", "example_hu": "Hazamegyek.", "root": "가"}, {"rank": 5, "korean": "오다 / 와요", "hungarian": "jönni", "example_kr": "여기로 와요.", "example_hu": "Gyere ide!", "root": "오"}, {"rank": 6, "korean": "보다 / 봐요", "hungarian": "nézni, látni", "example_kr": "영화를 봐요.", "example_hu": "Filmet nézek.", "root": "보"}, {"rank": 7, "korean": "먹다 / 먹어요", "hungarian": "enni", "example_kr": "밥을 먹어요.", "example_hu": "Eszegetek / Eszem.", "root": "먹"}, {"rank": 8, "korean": "마시다 / 마셔요", "hungarian": "inni", "example_kr": "물을 마셔요.", "example_hu": "Vizet iszom.", "root": "마"}, {"rank": 9, "korean": "자다 / 자요", "hungarian": "aludni", "example_kr": "일찍 자요.", "example_hu": "Korán alszom.", "root": "자"}, {"rank": 10, "korean": "일어나다 / 일어나요", "hungarian": "felkelni", "example_kr": "아침에 일찍 일어나요.", "example_hu": "Reggel korán kelek.", "root": "일"}, {"rank": 11, "korean": "좋다 / 좋아요", "hungarian": "jónak lenni, tetszeni", "example_kr": "날씨가 정말 좋아요.", "example_hu": "Nagyon jó az idő.", "root": "좋"}, {"rank": 12, "korean": "나쁘다 / 나빠요", "hungarian": "rossznak lenni", "example_kr": "기분이 나빠요.", "example_hu": "Rossz a kedvem.", "root": "나"}, {"rank": 13, "korean": "크다 / 커요", "hungarian": "nagynak lenni", "example_kr": "이 집은 아주 커요.", "example_hu": "Ez a ház nagyon nagy.", "root": "크"}, {"rank": 14, "korean": "작다 / 작아요", "hungarian": "kicsinek lenni", "example_kr": "방이 좀 작아요.", "example_hu": "A szoba kicsit kicsi.", "root": "작"}, {"rank": 15, "korean": "많다 / 많아요", "hungarian": "soknak lenni", "example_kr": "사람이 너무 많아요.", "example_hu": "Túl sok az ember.", "root": "많"}, {"rank": 16, "korean": "적다 / 적어요", "hungarian": "kevésnek lenni", "example_kr": "시간이 적어요.", "example_hu": "Kevés az idő.", "root": "적"}, {"rank": 17, "korean": "알다 / 알아요", "hungarian": "tudni, ismerni", "example_kr": "저도 그거 알아요.", "example_hu": "Én is tudom azt.", "root": "알"}, {"rank": 18, "korean": "모르다 / 몰라요", "hungarian": "nem tudni", "example_kr": "잘 몰라요.", "example_hu": "Nem tudom pontosan.", "root": "모"}, {"rank": 19, "korean": "주다 / 줘요", "hungarian": "adni", "example_kr": "물 좀 주세요.", "example_hu": "Kérek egy kis vizet.", "root": "주"}, {"rank": 20, "korean": "받다 / 받아요", "hungarian": "kapni", "example_kr": "선물을 받았어요.", "example_hu": "Ajándékot kaptam.", "root": "받"}, {"rank": 21, "korean": "사다 / 사요", "hungarian": "vásárolni, venni", "example_kr": "시장에서 과일을 사요.", "example_hu": "Gyümölcsöt veszek a piacon.", "root": "사"}, {"rank": 22, "korean": "팔다 / 팔아요", "hungarian": "eladni", "example_kr": "여기서는 책을 팔아요.", "example_hu": "Itt könyveket árulnak.", "root": "팔"}, {"rank": 23, "korean": "말하다 / 말해요", "hungarian": "beszélni, mondani", "example_kr": "천천히 말해 주세요.", "example_hu": "Kérlek beszélj lassan.", "root": "말"}, {"rank": 24, "korean": "듣다 / 들어요", "hungarian": "hallgatni, hallani", "example_kr": "음악을 들어요.", "example_hu": "Zenét hallgatok.", "root": "듣"}, {"rank": 25, "korean": "읽다 / 읽어요", "hungarian": "olvasni", "example_kr": "매일 책을 읽어요.", "example_hu": "Minden nap könyvet olvasok.", "root": "읽"}, {"rank": 26, "korean": "쓰다 / 써요", "hungarian": "írni / használni", "example_kr": "편지를 써요.", "example_hu": "Levelet írok.", "root": "쓰"}, {"rank": 27, "korean": "배우다 / 배워요", "hungarian": "tanulni (valakitől)", "example_kr": "한국어를 배워요.", "example_hu": "Koreaiul tanulok.", "root": "배"}, {"rank": 28, "korean": "공부하다 / 공부해요", "hungarian": "tanulni, magolni", "example_kr": "도서관에서 공부해요.", "example_hu": "A könyvtárban tanulok.", "root": "공"}, {"rank": 29, "korean": "일하다 / 일해요", "hungarian": "dolgozni", "example_kr": "회사에서 일해요.", "example_hu": "Egy cégnél dolgozom.", "root": "일"}, {"rank": 30, "korean": "쉬다 / 쉬어요", "hungarian": "pihenni", "example_kr": "주말에는 집에서 쉬어요.", "example_hu": "Hétvégén otthon pihenek.", "root": "쉬"}, {"rank": 31, "korean": "만나다 / 만나요", "hungarian": "találkozni", "example_kr": "친구를 만나요.", "example_hu": "Találkozom a barátommal.", "root": "만"}, {"rank": 32, "korean": "살다 / 살아요", "hungarian": "élni, lakni", "example_kr": "서울에 살아요.", "example_hu": "Szöulban lakom.", "root": "살"}, {"rank": 33, "korean": "죽다 / 죽어요", "hungarian": "meghalni", "example_kr": "배고파서 죽겠어요.", "example_hu": "Éhen halok (olyan éhes vagyok).", "root": "죽"}, {"rank": 34, "korean": "사랑하다 / 사랑해요", "hungarian": "szeretni", "example_kr": "가족을 정말 사랑해요.", "example_hu": "Nagyon szeretem a családomat.", "root": "사"}, {"rank": 35, "korean": "좋아하다 / 좋아해요", "hungarian": "kedvelni, szeretni", "example_kr": "커피를 좋아해요.", "example_hu": "Szeretem a kávét.", "root": "좋"}, {"rank": 36, "korean": "싫어하다 / 싫어해요", "hungarian": "utálni, nem kedvelni", "example_kr": "매운 음식을 싫어해요.", "example_hu": "Nem szeretem a csípős ételt.", "root": "싫"}, {"rank": 37, "korean": "사람", "hungarian": "ember, személy", "example_kr": "저 사람은 누구예요?", "example_hu": "Ki az az ember ott?", "root": "인"}, {"rank": 38, "korean": "시간", "hungarian": "idő, óra", "example_kr": "지금 몇 시예요? 시간이 없어요.", "example_hu": "Hány óra van most? Nincs időm.", "root": "간"}, {"rank": 39, "korean": "오늘", "hungarian": "ma", "example_kr": "오늘 날씨가 맑아요.", "example_hu": "Ma tiszta az idő.", "root": "일"}, {"rank": 40, "korean": "내일", "hungarian": "holnap", "example_kr": "내일 다시 만나요.", "example_hu": "Holnap újra találkozunk.", "root": "일"}, {"rank": 41, "korean": "어제", "hungarian": "tegnap", "example_kr": "어제 뭐 했어요?", "example_hu": "Mit csináltál tegnap?", "root": "어"}, {"rank": 42, "korean": "지금", "hungarian": "most", "example_kr": "지금 집에 가고 있어요.", "example_hu": "Most megyek haza.", "root": "금"}, {"rank": 43, "korean": "집", "hungarian": "ház, otthon", "example_kr": "우리 집은 역에서 가까워요.", "example_hu": "A házunk közel van az állomáshoz.", "root": "가"}, {"rank": 44, "korean": "학교", "hungarian": "iskola", "example_kr": "아이들이 학교에 가요.", "example_hu": "A gyerekek iskolába mennek.", "root": "학"}, {"rank": 45, "korean": "회사", "hungarian": "cég, munkahely", "example_kr": "아침마다 회사에 출근해요.", "example_hu": "Minden reggel bemegyek a céghez.", "root": "회"}, {"rank": 46, "korean": "친구", "hungarian": "barát", "example_kr": "어릴 때부터 친한 친구예요.", "example_hu": "Gyerekkorom óta közeli barátom.", "root": "친"}, {"rank": 47, "korean": "가족", "hungarian": "család", "example_kr": "우리 가족은 모두 네 명이에요.", "example_hu": "A családunk összesen négy főből áll.", "root": "가"}, {"rank": 48, "korean": "물", "hungarian": "víz", "example_kr": "차가운 물 한 잔 주세요.", "example_hu": "Kérek egy pohár hideg vizet.", "root": "물"}, {"rank": 49, "korean": "밥", "hungarian": "főtt rizs, étel", "example_kr": "아침 밥 먹었어요?", "example_hu": "Ettél már reggelit?", "root": "식"}, {"rank": 50, "korean": "돈", "hungarian": "pénz", "example_kr": "돈을 많이 벌고 싶어요.", "example_hu": "Sok pénzt szeretnék keresni.", "root": "금"}, {"rank": 51, "korean": "이름", "hungarian": "név", "example_kr": "이름이 뭐예요?", "example_hu": "Mi a neved?", "root": "명"}, {"rank": 52, "korean": "나라", "hungarian": "ország", "example_kr": "어느 나라에서 왔어요?", "example_hu": "Melyik országból jöttél?", "root": "국"}, {"rank": 53, "korean": "한국", "hungarian": "Dél-Korea", "example_kr": "한국에 가 본 적이 있어요?", "example_hu": "Voltál már Dél-Koreában?", "root": "국"}, {"rank": 54, "korean": "한국어", "hungarian": "koreai nyelv", "example_kr": "한국어가 아주 재미있어요.", "example_hu": "A koreai nyelv nagyon érdekes.", "root": "어"}, {"rank": 55, "korean": "영어", "hungarian": "angol nyelv", "example_kr": "영어를 잘하세요?", "example_hu": "Jól beszélsz angolul?", "root": "어"}, {"rank": 56, "korean": "말", "hungarian": "beszéd, szó", "example_kr": "무슨 말인지 알겠어요.", "example_hu": "Értem, mit mondasz.", "root": "언"}, {"rank": 57, "korean": "일", "hungarian": "munka, dolog, ügy", "example_kr": "요즘 일이 너무 바빠요.", "example_hu": "Mostanában túl sok a munka.", "root": "사"}, {"rank": 58, "korean": "생각", "hungarian": "gondolat", "example_kr": "좋은 생각이 났어요!", "example_hu": "Jó ötletem támadt!", "root": "생"}, {"rank": 59, "korean": "마음", "hungarian": "szív, lélek, érzés", "example_kr": "마음이 따뜻해졌어요.", "example_hu": "Melegség töltötte el a szívemet.", "root": "심"}, {"rank": 60, "korean": "눈", "hungarian": "szem / hó", "example_kr": "겨울에는 눈이 많이 와요.", "example_hu": "Télen sok hó esik.", "root": "안"}, {"rank": 61, "korean": "손", "hungarian": "kéz", "example_kr": "밥 먹기 전에 손을 씻어요.", "example_hu": "Evés előtt kezet mosok.", "root": "수"}, {"rank": 62, "korean": "발", "hungarian": "lábfej", "example_kr": "오래 걸어서 발이 아파요.", "example_hu": "Sokat gyalogoltam, fáj a lábam.", "root": "족"}, {"rank": 63, "korean": "머리", "hungarian": "fej, haj", "example_kr": "어제 머리를 짧게 잘랐어요.", "example_hu": "Tegnap rövidre vágattam a hajam.", "root": "두"}, {"rank": 64, "korean": "몸", "hungarian": "test", "example_kr": "운동하면 몸이 건강해져요.", "example_hu": "Ha sportolsz, egészséges lesz a tested.", "root": "신"}, {"rank": 65, "korean": "얼굴", "hungarian": "arc", "example_kr": "오랜만에 보니 얼굴이 좋아 보여요.", "example_hu": "Rég láttalak, jól nézel ki.", "root": "안"}, {"rank": 66, "korean": "소리", "hungarian": "hang, zaj", "example_kr": "밖에서 무슨 소리가 나요.", "example_hu": "Kintről valami hang hallatszik.", "root": "성"}, {"rank": 67, "korean": "길", "hungarian": "út, utca", "example_kr": "이 길로 쭉 가세요.", "example_hu": "Menj egyenesen ezen az úton.", "root": "도"}, {"rank": 68, "korean": "차", "hungarian": "autó / tea", "example_kr": "차를 타고 여행을 갔어요.", "example_hu": "Autóval mentünk kirándulni.", "root": "차"}, {"rank": 69, "korean": "책", "hungarian": "könyv", "example_kr": "이 책은 정말 감동적이에요.", "example_hu": "Ez a könyv igazán megható.", "root": "서"}, {"rank": 70, "korean": "영화", "hungarian": "film", "example_kr": "주말에 같이 영화 볼래요?", "example_hu": "Nézzünk együtt filmet hétvégén?", "root": "화"}, {"rank": 71, "korean": "음악", "hungarian": "zene", "example_kr": "자기 전에 조용한 음악을 들어요.", "example_hu": "Alvás előtt halk zenét hallgatok.", "root": "음"}, {"rank": 72, "korean": "사진", "hungarian": "fénykép", "example_kr": "여기서 사진 찍어도 돼요?", "example_hu": "Szabad itt fényképezni?", "root": "사"}, {"rank": 73, "korean": "전화", "hungarian": "telefon", "example_kr": "나중에 다시 전화할게요.", "example_hu": "Később visszahívlak.", "root": "화"}, {"rank": 74, "korean": "날씨", "hungarian": "időjárás", "example_kr": "내일 날씨가 어떨까요?", "example_hu": "Milyen lesz holnap az időjárás?", "root": "기"}, {"rank": 75, "korean": "비", "hungarian": "eső", "example_kr": "밖에 비가 오고 있어요.", "example_hu": "Kint esik az eső.", "root": "우"}, {"rank": 76, "korean": "바람", "hungarian": "szél", "example_kr": "오늘 바람이 시원하게 불어요.", "example_hu": "Ma hűs szél fúj.", "root": "풍"}, {"rank": 77, "korean": "아침", "hungarian": "reggel, reggeli", "example_kr": "아침마다 커피를 마셔요.", "example_hu": "Minden reggel kávét iszom.", "root": "조"}, {"rank": 78, "korean": "점심", "hungarian": "dél, ebéd", "example_kr": "점심으로 비빔밥을 먹었어요.", "example_hu": "Ebédre bibimbapot ettem.", "root": "오"}, {"rank": 79, "korean": "저녁", "hungarian": "este, vacsora", "example_kr": "저녁에 가족들과 식사해요.", "example_hu": "Este a családdal vacsorázom.", "root": "석"}, {"rank": 80, "korean": "밤", "hungarian": "éjszaka", "example_kr": "밤늦게까지 공부했어요.", "example_hu": "Késő éjszakáig tanultam.", "root": "야"}, {"rank": 81, "korean": "년", "hungarian": "év", "example_kr": "올해가 벌써 다 갔어요.", "example_hu": "Ez az év is már majdnem eltelt.", "root": "년"}, {"rank": 82, "korean": "월", "hungarian": "hónap", "example_kr": "다음 달은 12월이에요.", "example_hu": "A következő hónap december.", "root": "월"}, {"rank": 83, "korean": "일", "hungarian": "nap (dátum)", "example_kr": "오늘이 며칠이에요?", "example_hu": "Hányadika van ma?", "root": "일"}, {"rank": 84, "korean": "주", "hungarian": "hét", "example_kr": "이번 주는 정말 빨리 지나갔어요.", "example_hu": "Ez a hét nagyon gyorsan eltelt.", "root": "주"}, {"rank": 85, "korean": "많이", "hungarian": "sokat, nagyon", "example_kr": "맛있으니까 많이 드세요.", "example_hu": "Finom, úgyhogy egyél sokat!", "root": "다"}, {"rank": 86, "korean": "조금", "hungarian": "kicsit, egy keveset", "example_kr": "한국어를 조금 할 줄 알아요.", "example_hu": "Tudok egy kicsit koreaiul.", "root": "소"}, {"rank": 87, "korean": "아주", "hungarian": "nagyon", "example_kr": "이 음식이 아주 맛있어요.", "example_hu": "Ez az étel nagyon finom.", "root": "매"}, {"rank": 88, "korean": "정말", "hungarian": "tényleg, valóban", "example_kr": "정말 고맙습니다!", "example_hu": "Tényleg nagyon köszönöm!", "root": "진"}, {"rank": 89, "korean": "진짜", "hungarian": "igazán, tényleg (beszélt)", "example_kr": "진짜요? 믿을 수 없어요!", "example_hu": "Tényleg? Nem hiszem el!", "root": "진"}, {"rank": 90, "korean": "너무", "hungarian": "túlságosan, nagyon", "example_kr": "너무 피곤해서 일찍 잤어요.", "example_hu": "Túl fáradt voltam, ezért korán lefeküdtem.", "root": "태"}, {"rank": 91, "korean": "잘", "hungarian": "jól", "example_kr": "잘 지냈어요?", "example_hu": "Jól vagy / Jól telt az időd?", "root": "호"}, {"rank": 92, "korean": "못", "hungarian": "nem tud / képtelen", "example_kr": "수영을 못 해요.", "example_hu": "Nem tudok úszni.", "root": "불"}, {"rank": 93, "korean": "안", "hungarian": "nem (tagadás)", "example_kr": "오늘은 고기를 안 먹어요.", "example_hu": "Ma nem eszem húst.", "root": "부"}, {"rank": 94, "korean": "또", "hungarian": "újra, megint", "example_kr": "내일 또 만나요.", "example_hu": "Holnap újra találkozunk.", "root": "재"}, {"rank": 95, "korean": "다시", "hungarian": "ismét, újra", "example_kr": "다시 한 번 말씀해 주세요.", "example_hu": "Kérem mondja el még egyszer.", "root": "재"}, {"rank": 96, "korean": "같이", "hungarian": "együtt", "example_kr": "우리 같이 점심 먹을래요?", "example_hu": "Ebédeljünk együtt?", "root": "동"}, {"rank": 97, "korean": "혼자", "hungarian": "egyedül", "example_kr": "주말에는 혼자 영화 보는 걸 좋아해요.", "example_hu": "Hétvégén szeretek egyedül filmet nézni.", "root": "독"}, {"rank": 98, "korean": "빨리", "hungarian": "gyorsan", "example_kr": "시간이 없으니까 빨리 가요.", "example_hu": "Nincs időnk, menjünk gyorsan!", "root": "속"}, {"rank": 99, "korean": "천천히", "hungarian": "lassan", "example_kr": "천천히 걸어가도 괜찮아요.", "example_hu": "Az sem baj, ha lassan sétálunk.", "root": "완"}, {"rank": 100, "korean": "항상", "hungarian": "mindig", "example_kr": "항상 건강하세요!", "example_hu": "Legyél mindig egészséges!", "root": "상"}, {"rank": 101, "korean": "높다 / 높아요", "hungarian": "magasnak lenni", "example_kr": "저 산은 아주 높아요.", "example_hu": "Az a hegy nagyon magas.", "root": "고"}, {"rank": 102, "korean": "낮다 / 낮아요", "hungarian": "alacsonynak lenni", "example_kr": "천장이 좀 낮아요.", "example_hu": "A plafon kicsit alacsony.", "root": "저"}, {"rank": 103, "korean": "길다 / 길어요", "hungarian": "hosszúnak lenni", "example_kr": "머리카락이 많이 길었어요.", "example_hu": "Nagyon megnőtt a haja.", "root": "장"}, {"rank": 104, "korean": "짧다 / 짧아요", "hungarian": "rövidnek lenni", "example_kr": "겨울에는 낮이 짧아요.", "example_hu": "Télen rövidek a nappalok.", "root": "단"}, {"rank": 105, "korean": "넓다 / 넓어요", "hungarian": "szélesnek, tágasnak lenni", "example_kr": "거실이 아주 넓고 깨끗해요.", "example_hu": "A nappali nagyon tágas és tiszta.", "root": "광"}, {"rank": 106, "korean": "좁다 / 좁아요", "hungarian": "szűknek lenni", "example_kr": "골목길이 너무 좁아요.", "example_hu": "A sikátor túl szűk.", "root": "협"}, {"rank": 107, "korean": "비싸다 / 비싸요", "hungarian": "drágának lenni", "example_kr": "이 가방은 너무 비싸요.", "example_hu": "Ez a táska túl drága.", "root": "귀"}, {"rank": 108, "korean": "싸다 / 싸요", "hungarian": "olcsónak lenni", "example_kr": "시장에서는 채소가 싸요.", "example_hu": "A piacon olcsó a zöldség.", "root": "염"}, {"rank": 109, "korean": "맛있다 / 맛있어요", "hungarian": "finomnak lenni", "example_kr": "이 식당 음식이 정말 맛있어요.", "example_hu": "Ennek az étteremnek az étele nagyon finom.", "root": "미"}, {"rank": 110, "korean": "맛없다 / 맛없어요", "hungarian": "ízetlennek, rossz ízűnek lenni", "example_kr": "너무 짜서 맛없어요.", "example_hu": "Túl sós, ezért nem finom.", "root": "미"}, {"rank": 111, "korean": "재미있다 / 재미있어요", "hungarian": "érdekesnek, szórakoztatónak lenni", "example_kr": "한국 드라마가 정말 재미있어요.", "example_hu": "A koreai sorozatok nagyon szórakoztatóak.", "root": "미"}, {"rank": 112, "korean": "재미없다 / 재미없어요", "hungarian": "unalmasnak lenni", "example_kr": "그 영화는 좀 재미없었어요.", "example_hu": "Az a film kicsit unalmas volt.", "root": "미"}, {"rank": 113, "korean": "쉽다 / 쉬워요", "hungarian": "könnyűnek lenni", "example_kr": "이 문제는 생각보다 쉬워요.", "example_hu": "Ez a feladat könnyebb, mint gondoltam.", "root": "이"}, {"rank": 114, "korean": "어렵다 / 어려워요", "hungarian": "nehéznek lenni", "example_kr": "한국어 발음이 조금 어려워요.", "example_hu": "A koreai kiejtés egy kicsit nehéz.", "root": "난"}, {"rank": 115, "korean": "바쁘다 / 바빠요", "hungarian": "elfoglaltnak lenni", "example_kr": "이번 주는 일이 많아서 바빠요.", "example_hu": "Ezen a héten sok a munka, elfoglalt vagyok.", "root": "망"}, {"rank": 116, "korean": "한가하다 / 한가해요", "hungarian": "ráérni, szabadnak lenni", "example_kr": "오후에는 좀 한가해요.", "example_hu": "Délután kicsit jobban ráérek.", "root": "한"}, {"rank": 117, "korean": "피곤하다 / 피곤해요", "hungarian": "fáradtnak lenni", "example_kr": "어제 잠을 못 자서 피곤해요.", "example_hu": "Tegnap nem tudtam aludni, fáradt vagyok.", "root": "피"}, {"rank": 118, "korean": "아프다 / 아파요", "hungarian": "fájni, betegnek lenni", "example_kr": "머리가 좀 아파요.", "example_hu": "Kicsit fáj a fejem.", "root": "통"}, {"rank": 119, "korean": "건강하다 / 건강해요", "hungarian": "egészségesnek lenni", "example_kr": "부모님이 모두 건강하세요.", "example_hu": "A szüleim mindketten egészségesek.", "root": "건"}, {"rank": 120, "korean": "행복하다 / 행복해요", "hungarian": "boldognak lenni", "example_kr": "가족과 함께 있어서 행복해요.", "example_hu": "Boldog vagyok, hogy a családommal lehetek.", "root": "행"}, {"rank": 121, "korean": "슬프다 / 슬퍼요", "hungarian": "szomorúnak lenni", "example_kr": "슬픈 영화를 보고 울었어요.", "example_hu": "Szomorú filmet néztem és sírtam.", "root": "비"}, {"rank": 122, "korean": "기쁘다 / 기뻐요", "hungarian": "örömtelinek lenni, örülni", "example_kr": "합격 소식을 들어서 정말 기뻐요.", "example_hu": "Nagyon örülök, hogy hallottam a sikeres vizsgáról.", "root": "희"}, {"rank": 123, "korean": "화나다 / 화나요", "hungarian": "mérgesnek lenni", "example_kr": "약속을 안 지켜서 화가 났어요.", "example_hu": "Mérges lettem, mert nem tartotta be az ígéretét.", "root": "화"}, {"rank": 124, "korean": "무섭다 / 무서워요", "hungarian": "félelmetesnek lenni, félni", "example_kr": "밤에 혼자 걷는 건 좀 무서워요.", "example_hu": "Éjszaka egyedül sétálni kicsit félelmetes.", "root": "공"}, {"rank": 125, "korean": "덥다 / 더워요", "hungarian": "melegnek lenni (időjárás)", "example_kr": "여름에는 날씨가 너무 더워요.", "example_hu": "Nyáron túl meleg az idő.", "root": "서"}, {"rank": 126, "korean": "춥다 / 추워요", "hungarian": "hidegnek lenni (időjárás)", "example_kr": "겨울에는 바람이 불어서 추워요.", "example_hu": "Télen fúj a szél, ezért hideg van.", "root": "한"}, {"rank": 127, "korean": "따뜻하다 / 따뜻해요", "hungarian": "melegnek, kellemesnek lenni", "example_kr": "봄이 되니까 날씨가 따뜻해요.", "example_hu": "Eljött a tavasz, kellemes meleg van.", "root": "온"}, {"rank": 128, "korean": "시원하다 / 시원해요", "hungarian": "hűvösnek, frissítőnek lenni", "example_kr": "시원한 바람이 불어와요.", "example_hu": "Frissítő, hűs szél fúj.", "root": "량"}, {"rank": 129, "korean": "깨끗하다 / 깨끗해요", "hungarian": "tisztának lenni", "example_kr": "청소를 해서 방이 깨끗해요.", "example_hu": "Kitakarítottam, ezért tiszta a szoba.", "root": "청"}, {"rank": 130, "korean": "더럽다 / 더러워요", "hungarian": "koszosnak lenni", "example_kr": "비가 와서 신발이 더러워졌어요.", "example_hu": "Esik az eső, koszos lett a cipőm.", "root": "오"}, {"rank": 131, "korean": "예쁘다 / 예뻐요", "hungarian": "szépnek, csinosnak lenni", "example_kr": "꽃이 정말 예쁘게 피었어요.", "example_hu": "A virágok nagyon szépen kinyíltak.", "root": "미"}, {"rank": 132, "korean": "멋있다 / 멋있어요", "hungarian": "menőnek, jóképűnek lenni", "example_kr": "정장을 입으니까 아주 멋있어요.", "example_hu": "Nagyon elegáns vagy öltönyben.", "root": "멋"}, {"rank": 133, "korean": "귀엽다 / 귀여워요", "hungarian": "aranyosnak lenni", "example_kr": "강아지가 너무 귀여워요.", "example_hu": "A kiskutya nagyon aranyos.", "root": "귀"}, {"rank": 134, "korean": "친절하다 / 친절해요", "hungarian": "kedvesnek, segítőkésznek lenni", "example_kr": "한국 사람들은 정말 친절해요.", "example_hu": "A koreai emberek nagyon kedvesek.", "root": "친"}, {"rank": 135, "korean": "똑똑하다 / 똑똑해요", "hungarian": "okosnak lenni", "example_kr": "그 학생은 아주 똑똑해요.", "example_hu": "Az a diák nagyon okos.", "root": "총"}, {"rank": 136, "korean": "열다 / 열어요", "hungarian": "kinyitni", "example_kr": "더우니까 창문을 좀 열어요.", "example_hu": "Meleg van, nyissuk ki kicsit az ablakot.", "root": "개"}, {"rank": 137, "korean": "닫다 / 닫아요", "hungarian": "becsukni", "example_kr": "나갈 때 문을 꼭 닫으세요.", "example_hu": "Kérlek csukd be az ajtót, amikor kimész.", "root": "폐"}, {"rank": 138, "korean": "켜다 / 켜요", "hungarian": "bekapcsolni", "example_kr": "어두우니까 불을 켜세요.", "example_hu": "Sötét van, kapcsold fel a villanyt.", "root": "점"}, {"rank": 139, "korean": "끄다 / 꺼요", "hungarian": "kikapcsolni", "example_kr": "자기 전에 텔레비전을 꺼요.", "example_hu": "Alvás előtt kikapcsolom a tévét.", "root": "소"}, {"rank": 140, "korean": "앉다 / 앉아요", "hungarian": "leülni", "example_kr": "이쪽 의자에 앉으세요.", "example_hu": "Üljön le erre a székre.", "root": "좌"}, {"rank": 141, "korean": "서다 / 서요", "hungarian": "állni", "example_kr": "줄을 서서 기다리고 있어요.", "example_hu": "Sorban állva várakozom.", "root": "립"}, {"rank": 142, "korean": "걷다 / 걸어요", "hungarian": "gyalogolni, sétálni", "example_kr": "공원길을 천천히 걸어요.", "example_hu": "Lassan sétálok a park útján.", "root": "보"}, {"rank": 143, "korean": "뛰다 / 뛰어요", "hungarian": "futni, ugrani", "example_kr": "늦어서 역까지 뛰어갔어요.", "example_hu": "Késésben voltam, elfutottam az állomásig.", "root": "주"}, {"rank": 144, "korean": "타다 / 타요", "hungarian": "felszállni (járműre), utazni", "example_kr": "아침마다 지하철을 타요.", "example_hu": "Minden reggel metróval utazom.", "root": "승"}, {"rank": 145, "korean": "내리다 / 내려요", "hungarian": "leszállni (járműről), esni", "example_kr": "다음 역에서 내려야 해요.", "example_hu": "A következő megállónál kell leszállnom.", "root": "하"}, {"rank": 146, "korean": "들어가다 / 들어가요", "hungarian": "bemenni", "example_kr": "집 안으로 들어가요.", "example_hu": "Bemegyek a házba.", "root": "입"}, {"rank": 147, "korean": "나오다 / 나와요", "hungarian": "kijönni, megjelenni", "example_kr": "밖으로 나오세요.", "example_hu": "Gyere ki a szabadba!", "root": "출"}, {"rank": 148, "korean": "올라가다 / 올라가요", "hungarian": "felmenni", "example_kr": "계단으로 3층까지 올라가요.", "example_hu": "Lépcsőn megyek fel a 3. emeletre.", "root": "상"}, {"rank": 149, "korean": "내려가다 / 내려가요", "hungarian": "lemenni", "example_kr": "엘리베이터를 타고 내려가요.", "example_hu": "Lifttel megyek le.", "root": "하"}, {"rank": 150, "korean": "기다리다 / 기다려요", "hungarian": "várni", "example_kr": "카페 앞에서 친구를 기다려요.", "example_hu": "A kávézó előtt várom a barátomat.", "root": "대"}, {"rank": 151, "korean": "만들다 / 만들어요", "hungarian": "készíteni, csinálni", "example_kr": "주말에 김밥을 만들어요.", "example_hu": "Hétvégén kimbapot készítek.", "root": "작"}, {"rank": 152, "korean": "요리하다 / 요리해요", "hungarian": "főzni", "example_kr": "집에서 직접 요리해요.", "example_hu": "Otthon magamnak főzök.", "root": "요"}, {"rank": 153, "korean": "씻다 / 씻어요", "hungarian": "mosni, mosakodni", "example_kr": "아침에 세수하고 이를 씻어요.", "example_hu": "Reggel arcot és fogat mosok.", "root": "세"}, {"rank": 154, "korean": "입다 / 입어요", "hungarian": "felvenni (ruhát)", "example_kr": "추우니까 두꺼운 옷을 입어요.", "example_hu": "Hideg van, vastag ruhát veszek fel.", "root": "착"}, {"rank": 155, "korean": "벗다 / 벗어요", "hungarian": "levenni (ruhát/cipőt)", "example_kr": "집에 들어가면 신발을 벗어요.", "example_hu": "Ha bemegyünk a házba, levesszük a cipőt.", "root": "탈"}, {"rank": 156, "korean": "신다 / 신어요", "hungarian": "felvenni (cipőt/zoknit)", "example_kr": "운동화를 신고 산책해요.", "example_hu": "Sportcipőt húzok és sétálok.", "root": "착"}, {"rank": 157, "korean": "쓰다 / 써요", "hungarian": "feltenni (kalapot/szemüveget)", "example_kr": "햇빛이 강해서 모자를 써요.", "example_hu": "Erős a napfény, sapkát veszek fel.", "root": "착"}, {"rank": 158, "korean": "찾다 / 찾아요", "hungarian": "keresni, megtalálni", "example_kr": "열쇠를 찾고 있어요.", "example_hu": "A kulcsomat keresem.", "root": "탐"}, {"rank": 159, "korean": "잃어버리다 / 잃어버려요", "hungarian": "elveszíteni", "example_kr": "지갑을 잃어버렸어요.", "example_hu": "Elvesztettem a pénztárcámat.", "root": "실"}, {"rank": 160, "korean": "보내다 / 보내요", "hungarian": "küldeni / időt tölteni", "example_kr": "친구에게 문자를 보내요.", "example_hu": "Üzenetet küldök a barátomnak.", "root": "송"}, {"rank": 161, "korean": "부르다 / 불러요", "hungarian": "hívni, énekelni", "example_kr": "노래방에서 노래를 불러요.", "example_hu": "A karaokéban dalokat énekelünk.", "root": "호"}, {"rank": 162, "korean": "묻다 / 물어요", "hungarian": "kérdezni", "example_kr": "모르는 것을 선생님께 물어요.", "example_hu": "Megkérdezem a tanártól, amit nem tudok.", "root": "문"}, {"rank": 163, "korean": "대답하다 / 대답해요", "hungarian": "válaszolni", "example_kr": "질문에 정확하게 대답해요.", "example_hu": "Pontosan válaszolok a kérdésre.", "root": "답"}, {"rank": 164, "korean": "도와주다 / 도와줘요", "hungarian": "segíteni", "example_kr": "제가 짐을 들어 도와줄게요.", "example_hu": "Segítek vinni a csomagot.", "root": "조"}, {"rank": 165, "korean": "시작하다 / 시작해요", "hungarian": "elkezdeni", "example_kr": "수업이 9시에 시작해요.", "example_hu": "Az óra 9-kor kezdődik.", "root": "시"}, {"rank": 166, "korean": "끝나다 / 끝나요", "hungarian": "befejeződni", "example_kr": "일이 6시에 끝나요.", "example_hu": "A munka 6-kor ér véget.", "root": "종"}, {"rank": 167, "korean": "준비하다 / 준비해요", "hungarian": "felkészülni, előkészíteni", "example_kr": "여행 가방을 준비해요.", "example_hu": "Összekészítem az utazótáskát.", "root": "준"}, {"rank": 168, "korean": "약속하다 / 약속해요", "hungarian": "megígérni, megbeszélni", "example_kr": "내일 만나기로 약속했어요.", "example_hu": "Megbeszéltük, hogy holnap találkozunk.", "root": "약"}, {"rank": 169, "korean": "결정하다 / 결정해요", "hungarian": "dönteni", "example_kr": "아직 아무것도 결정하지 못했어요.", "example_hu": "Még semmit sem tudtam eldönteni.", "root": "결"}, {"rank": 170, "korean": "선택하다 / 선택해요", "hungarian": "választani", "example_kr": "메뉴를 천천히 선택하세요.", "example_hu": "Válassza ki nyugodtan a menüt.", "root": "선"}, {"rank": 171, "korean": "기억하다 / 기억해요", "hungarian": "emlékezni", "example_kr": "그날의 일을 잘 기억해요.", "example_hu": "Jól emlékszem annak a napnak az eseményeire.", "root": "기"}, {"rank": 172, "korean": "잊어버리다 / 잊어버려요", "hungarian": "elfelejteni", "example_kr": "약속 시간을 깜빡 잊어버렸어요.", "example_hu": "Teljesen elfelejtettem a találkozó idejét.", "root": "망"}, {"rank": 173, "korean": "생각하다 / 생각해요", "hungarian": "gondolkodni, gondolni", "example_kr": "항상 긍정적으로 생각해요.", "example_hu": "Mindig pozitívan gondolkodom.", "root": "생"}, {"rank": 174, "korean": "믿다 / 믿어요", "hungarian": "hinni, bízni", "example_kr": "나는 너를 끝까지 믿어.", "example_hu": "Én a végsőkig bízom benned.", "root": "신"}, {"rank": 175, "korean": "걱정하다 / 걱정해요", "hungarian": "aggódni", "example_kr": "너무 걱정하지 마세요.", "example_hu": "Ne aggódj túl sokat!", "root": "걱"}, {"rank": 176, "korean": "노력하다 / 노력해요", "hungarian": "igyekezni, erőfeszítést tenni", "example_kr": "매일 열심히 노력하고 있어요.", "example_hu": "Minden nap szorgalmasan igyekszem.", "root": "노"}, {"rank": 177, "korean": "성공하다 / 성공해요", "hungarian": "sikert aratni", "example_kr": "드디어 프로젝트에 성공했어요.", "example_hu": "Végre sikerrel járt a projekt.", "root": "성"}, {"rank": 178, "korean": "실패하다 / 실패해요", "hungarian": "kudarcot vallani", "example_kr": "실패해도 다시 도전하면 돼요.", "example_hu": "Ha nem is sikerül, újra meg lehet próbálni.", "root": "실"}, {"rank": 179, "korean": "바꾸다 / 바꿔요", "hungarian": "kicserélni, megváltoztatni", "example_kr": "새 휴대폰으로 바꿨어요.", "example_hu": "Új mobiltelefonra váltottam.", "root": "교"}, {"rank": 180, "korean": "고치다 / 고쳐요", "hungarian": "megjavítani, kijavítani", "example_kr": "고장 난 컴퓨터를 고쳤어요.", "example_hu": "Megjavítottam az elromlott számítógépet.", "root": "수"}, {"rank": 181, "korean": "청소하다 / 청소해요", "hungarian": "takarítani", "example_kr": "토요일마다 방을 청소해요.", "example_hu": "Minden szombaton kitakarítom a szobát.", "root": "청"}, {"rank": 182, "korean": "빨래하다 / 빨래해요", "hungarian": "mosni (ruhát)", "example_kr": "날씨가 좋아서 빨래했어요.", "example_hu": "Szép az idő, ezért kimostam a ruhákat.", "root": "세"}, {"rank": 183, "korean": "운동하다 / 운동해요", "hungarian": "sportolni, edzeni", "example_kr": "헬스장에서 매일 운동해요.", "example_hu": "Minden nap edzek az edzőteremben.", "root": "운"}, {"rank": 184, "korean": "산책하다 / 산책해요", "hungarian": "sétálni", "example_kr": "저녁 먹고 강변을 산책해요.", "example_hu": "Vacsora után sétálok a folyóparton.", "root": "산"}, {"rank": 185, "korean": "여행하다 / 여행해요", "hungarian": "utazni", "example_kr": "세계 여러 나라를 여행하고 싶어요.", "example_hu": "A világ sok országába szeretnék elutazni.", "root": "여"}, {"rank": 186, "korean": "출발하다 / 출발해요", "hungarian": "elindulni", "example_kr": "기차가 곧 출발해요.", "example_hu": "A vonat hamarosan indul.", "root": "출"}, {"rank": 187, "korean": "도착하다 / 도착해요", "hungarian": "megérkezni", "example_kr": "공항에 한 시간 일찍 도착했어요.", "example_hu": "Egy órával korábban érkeztem a repülőtérre.", "root": "도"}, {"rank": 188, "korean": "건너다 / 건너요", "hungarian": "átkelni (úton)", "example_kr": "횡단보도로 길을 건너세요.", "example_hu": "A zebrán keljen át az úton.", "root": "횡"}, {"rank": 189, "korean": "돌아가다 / 돌아가요", "hungarian": "visszamenni", "example_kr": "다음 주에 고향으로 돌아가요.", "example_hu": "Jövő héten visszamegyek a szülővárosomba.", "root": "귀"}, {"rank": 190, "korean": "이사하다 / 이사해요", "hungarian": "költözni", "example_kr": "지난달에 새 아파트로 이사했어요.", "example_hu": "Múlt hónapban új lakásba költöztem.", "root": "이"}, {"rank": 191, "korean": "병원", "hungarian": "kórház, rendelő", "example_kr": "감기에 걸려서 병원에 갔어요.", "example_hu": "Megfáztam, ezért orvoshoz mentem.", "root": "원"}, {"rank": 192, "korean": "약국", "hungarian": "gyógyszertár", "example_kr": "약국에서 두통약을 샀어요.", "example_hu": "A gyógyszertárban vettem fejfájáscsillapítót.", "root": "약"}, {"rank": 193, "korean": "은행", "hungarian": "bank", "example_kr": "은행에 가서 돈을 찾았어요.", "example_hu": "Elmentem a bankba és vettem fel pénzt.", "root": "은"}, {"rank": 194, "korean": "우체국", "hungarian": "posta", "example_kr": "우체국에서 소포를 보냈어요.", "example_hu": "A postán adtam fel a csomagot.", "root": "우"}, {"rank": 195, "korean": "경찰서", "hungarian": "rendőrség", "example_kr": "길을 잃어서 경찰서에 물어봤어요.", "example_hu": "Eltévedtem, ezért a rendőrségen kérdeztem meg az utat.", "root": "경"}, {"rank": 196, "korean": "소방서", "hungarian": "tűzoltóság", "example_kr": "소방서가 집 근처에 있어요.", "example_hu": "A tűzoltóság a ház közelében van.", "root": "소"}, {"rank": 197, "korean": "공항", "hungarian": "repülőtér", "example_kr": "인천 공항은 정말 크고 깨끗해요.", "example_hu": "Az incheoni repülőtér nagyon nagy és tiszta.", "root": "공"}, {"rank": 198, "korean": "역", "hungarian": "vasútállomás, metrómegálló", "example_kr": "서울역에서 기차를 탔어요.", "example_hu": "A szöuli pályaudvaron szálltam vonatra.", "root": "역"}, {"rank": 199, "korean": "정류장", "hungarian": "buszmegálló", "example_kr": "버스 정류장이 바로 저기예요.", "example_hu": "A buszmegálló pontosan ott van.", "root": "장"}, {"rank": 200, "korean": "시장", "hungarian": "piac", "example_kr": "전통 시장에는 먹을 것이 많아요.", "example_hu": "A hagyományos piacon sok finomság van.", "root": "장"}, {"rank": 201, "korean": "마트", "hungarian": "szupermarket", "example_kr": "마트에서 장을 보고 왔어요.", "example_hu": "Bevásároltam a szupermarketben.", "root": "마"}, {"rank": 202, "korean": "편의점", "hungarian": "kisbolt (0-24)", "example_kr": "밤에 편의점에서 아이스크림을 샀어요.", "example_hu": "Éjszaka vettem fagyit a kisboltban.", "root": "점"}, {"rank": 203, "korean": "백화점", "hungarian": "áruház", "example_kr": "백화점에서 선물을 골랐어요.", "example_hu": "Az áruházban választottam ajándékot.", "root": "점"}, {"rank": 204, "korean": "서점", "hungarian": "könyvesbolt", "example_kr": "서점에서 한국어 교재를 샀어요.", "example_hu": "A könyvesboltban vettem koreai tankönyvet.", "root": "점"}, {"rank": 205, "korean": "도서관", "hungarian": "könyvtár", "example_kr": "도서관에서는 조용히 해야 해요.", "example_hu": "A könyvtárban csendben kell lenni.", "root": "관"}, {"rank": 206, "korean": "박물관", "hungarian": "múzeum", "example_kr": "국립 박물관에 견학을 갔어요.", "example_hu": "Kirándulni mentünk a Nemzeti Múzeumba.", "root": "관"}, {"rank": 207, "korean": "미술관", "hungarian": "művészeti galéria", "example_kr": "주말에 미술관에서 전시회를 봤어요.", "example_hu": "Hétvégén kiállítást néztem a galériában.", "root": "관"}, {"rank": 208, "korean": "영화관", "hungarian": "mozi", "example_kr": "영화관에서 팝콘을 먹었어요.", "example_hu": "Popcornt ettem a moziban.", "root": "관"}, {"rank": 209, "korean": "식당", "hungarian": "étterem", "example_kr": "이 식당은 김치찌개가 유명해요.", "example_hu": "Ez az étterem a kimchi pörköltjéről híres.", "root": "식"}, {"rank": 210, "korean": "카페", "hungarian": "kávézó", "example_kr": "카페에서 친구와 수다를 떨었어요.", "example_hu": "A kávézóban beszélgettem a barátommal.", "root": "카"}, {"rank": 211, "korean": "빵집", "hungarian": "pékség", "example_kr": "아침마다 빵집에서 갓 구운 빵을 사요.", "example_hu": "Minden reggel frissen sült kenyeret veszek a pékségben.", "root": "집"}, {"rank": 212, "korean": "미용실", "hungarian": "fodrászat", "example_kr": "미용실에 가서 파마를 했어요.", "example_hu": "Elmentem a fodrászhoz daueroltatni.", "root": "실"}, {"rank": 213, "korean": "호텔", "hungarian": "szálloda", "example_kr": "바다가 보이는 호텔을 예약했어요.", "example_hu": "Tengerre néző szállodát foglaltam.", "root": "호"}, {"rank": 214, "korean": "공원", "hungarian": "park", "example_kr": "봄에는 공원에 벚꽃이 예뻐요.", "example_hu": "Tavasszal szépek a cseresznyevirágok a parkban.", "root": "원"}, {"rank": 215, "korean": "산", "hungarian": "hegy", "example_kr": "주말마다 등산하러 산에 가요.", "example_hu": "Minden hétvégén hegyet mászni megyek.", "root": "산"}, {"rank": 216, "korean": "바다", "hungarian": "tenger", "example_kr": "여름 휴가로 동해 바다에 갔어요.", "example_hu": "Nyári szabadságra a Keleti-tengerhez mentünk.", "root": "해"}, {"rank": 217, "korean": "강", "hungarian": "folyó", "example_kr": "한강 야경이 정말 아름다워요.", "example_hu": "A Han-folyó éjszakai látképe gyönyörű.", "root": "강"}, {"rank": 218, "korean": "하늘", "hungarian": "égbolt", "example_kr": "오늘 하늘에 구름 한 점 없어요.", "example_hu": "Ma egyetlen felhő sincs az égen.", "root": "천"}, {"rank": 219, "korean": "땅", "hungarian": "föld, talaj", "example_kr": "비가 와서 땅이 젖었어요.", "example_hu": "Esik az eső, átnedvesedett a föld.", "root": "지"}, {"rank": 220, "korean": "방", "hungarian": "szoba", "example_kr": "제 방에는 큰 책상이 있어요.", "example_hu": "A szobámban van egy nagy íróasztal.", "root": "방"}, {"rank": 221, "korean": "부엌", "hungarian": "konyha", "example_kr": "어머니께서 부엌에서 요리하세요.", "example_hu": "Édesanyám a konyhában főz.", "root": "주"}, {"rank": 222, "korean": "거실", "hungarian": "nappali", "example_kr": "가족들이 거실에 모여 앉았어요.", "example_hu": "A család összegyűlt a nappaliban.", "root": "실"}, {"rank": 223, "korean": "화장실", "hungarian": "mosdó, fürdőszoba", "example_kr": "화장실이 어디에 있어요?", "example_hu": "Merre van a mosdó?", "root": "실"}, {"rank": 224, "korean": "창문", "hungarian": "ablak", "example_kr": "환기하려고 창문을 열었어요.", "example_hu": "Kinyitottam az ablakot szellőztetni.", "root": "문"}, {"rank": 225, "korean": "문", "hungarian": "ajtó", "example_kr": "노크하고 문을 여세요.", "example_hu": "Kopogj és nyisd ki az ajtót!", "root": "문"}, {"rank": 226, "korean": "계단", "hungarian": "lépcső", "example_kr": "운동 삼아 계단으로 걸어 올라가요.", "example_hu": "Edzésképpen lépcsőn megyek fel.", "root": "계"}, {"rank": 227, "korean": "버스", "hungarian": "busz", "example_kr": "집 앞에서 버스를 타고 가요.", "example_hu": "A ház előtt szállok fel a buszra.", "root": "버"}, {"rank": 228, "korean": "지하철", "hungarian": "metró", "example_kr": "출퇴근 시간에는 지하철이 빨라요.", "example_hu": "Csúcsidőben a metró a leggyorsabb.", "root": "철"}, {"rank": 229, "korean": "택시", "hungarian": "taxi", "example_kr": "짐이 많아서 택시를 탔어요.", "example_hu": "Sok volt a csomagom, ezért taxiba ültem.", "root": "택"}, {"rank": 230, "korean": "기차", "hungarian": "vonat", "example_kr": "KTX 기차를 타면 부산까지 금방 가요.", "example_hu": "A KTX gyorsvonattal pillanatok alatt Puszanba érsz.", "root": "차"}, {"rank": 231, "korean": "비행기", "hungarian": "repülőgép", "example_kr": "비행기를 타고 제주도에 갔어요.", "example_hu": "Repülővel utaztam Csedzsu-szigetre.", "root": "기"}, {"rank": 232, "korean": "자전거", "hungarian": "kerékpár", "example_kr": "공원에서 자전거를 타는 게 좋아요.", "example_hu": "Jó dolog biciklizni a parkban.", "root": "차"}, {"rank": 233, "korean": "배", "hungarian": "hajó / körte / has", "example_kr": "배를 타고 섬으로 들어갔어요.", "example_hu": "Hajóval mentünk át a szigetre.", "root": "선"}, {"rank": 234, "korean": "음식", "hungarian": "étel", "example_kr": "한국 음식 중에서 뭘 제일 좋아해요?", "example_hu": "A koreai ételek közül mit szeretsz a legjobban?", "root": "식"}, {"rank": 235, "korean": "과일", "hungarian": "gyümölcs", "example_kr": "식후에 신선한 과일을 먹어요.", "example_hu": "Étkezés után friss gyümölcsöt eszem.", "root": "과"}, {"rank": 236, "korean": "채소", "hungarian": "zöldség", "example_kr": "건강을 위해 채소를 많이 드세요.", "example_hu": "Az egészségedért egyél sok zöldséget!", "root": "채"}, {"rank": 237, "korean": "고기", "hungarian": "hús", "example_kr": "저녁에 삼겹살 고기를 구워 먹었어요.", "example_hu": "Este császárhúst sütöttünk vacsorára.", "root": "육"}, {"rank": 238, "korean": "생선", "hungarian": "hal", "example_kr": "생선 구이가 아주 담백해요.", "example_hu": "A sült hal nagyon ízletes és könnyű.", "root": "어"}, {"rank": 239, "korean": "빵", "hungarian": "kenyér, péksütemény", "example_kr": "아침에는 간단하게 빵과 우유를 먹어요.", "example_hu": "Reggelire egyszerűen kenyeret és tejet eszem.", "root": "빵"}, {"rank": 240, "korean": "국", "hungarian": "leves", "example_kr": "따뜻한 국 한 그릇 드세요.", "example_hu": "Egyél egy tál meleg levest!", "root": "탕"}, {"rank": 241, "korean": "김치", "hungarian": "kimchi", "example_kr": "한국 식탁에는 김치가 빠질 수 없어요.", "example_hu": "A koreai asztalról nem hiányozhat a kimchi.", "root": "김"}, {"rank": 242, "korean": "라면", "hungarian": "instant tészta, ramen", "example_kr": "밤에 먹는 라면이 제일 맛있어요.", "example_hu": "Az éjszaka evett ramen a legfinomabb.", "root": "면"}, {"rank": 243, "korean": "커피", "hungarian": "kávé", "example_kr": "아이스 아메리카노 한 잔 주세요.", "example_hu": "Kérek egy jeges Americano kávét.", "root": "커"}, {"rank": 244, "korean": "우유", "hungarian": "tej", "example_kr": "매일 아침 우유를 한 잔 마셔요.", "example_hu": "Minden reggel megiszom egy pohár tejet.", "root": "유"}, {"rank": 245, "korean": "주스", "hungarian": "gyümölcslé", "example_kr": "오렌지 주스 마실래요?", "example_hu": "Iszol narancslevet?", "root": "주"}, {"rank": 246, "korean": "맥주", "hungarian": "sör", "example_kr": "치킨에는 역시 시원한 맥주죠!", "example_hu": "A sült csirkéhez természetesen hideg sör illik!", "root": "주"}, {"rank": 247, "korean": "소주", "hungarian": "szodzsu (koreai ital)", "example_kr": "친구들과 소주 한잔했어요.", "example_hu": "Megittam egy pohár szodzsut a barátokkal.", "root": "주"}, {"rank": 248, "korean": "설탕", "hungarian": "cukor", "example_kr": "커피에 설탕은 넣지 마세요.", "example_hu": "Ne tegyél cukrot a kávéba!", "root": "당"}, {"rank": 249, "korean": "소금", "hungarian": "só", "example_kr": "국이 싱거워서 소금을 조금 넣었어요.", "example_hu": "Ízetlen volt a leves, tettem bele egy kis sót.", "root": "염"}, {"rank": 250, "korean": "옷", "hungarian": "ruha, öltözék", "example_kr": "백화점에서 새 옷을 샀어요.", "example_hu": "Új ruhát vettem az áruházban.", "root": "의"}];
+
+    // =========================================================================
+    // 2. ADAPTIVE DSR (Difficulty - Stability - Retrievability) SRS ENGINE
+    // =========================================================================
+    const STORAGE_VOCAB_KEY = "kr_srs_vocab_v1";
+    const STORAGE_STATUS_KEY = "kr_srs_status_v1";
+
+    let vocabList = [];
+    let appStatus = {
+      version: "1.0",
+      startDate: new Date().toISOString().slice(0, 10),
+      currentDayNumber: 1,
+      lastSessionDate: new Date().toISOString().slice(0, 10),
+      todayCompletedPrimaryPass: false,
+      totalDaysStudied: 1,
+      studiedDates: [new Date().toISOString().slice(0, 10)],
+      todayAskedCount: 0,
+      totalAskedCount: 0,
+      todayCorrectCount: 0,
+      todayWrongCount: 0,
+      totalCorrectCount: 0,
+      totalWrongCount: 0,
+      settings: {
+        koreanVoiceOnly: false,
+        darkMode: true
+      }
+    };
+
+    let currentPhase = 1;
+    let currentWord = null;
+    let currentOptions = [];
+    let questionStartTime = 0;
+    let answeredCurrent = false;
+    let lastShownRank = -1;
+
+    function createDefaultWordEntry(raw) {
+      return {
+        rank: Number(raw.rank),
+        korean: raw.korean,
+        hungarian: raw.hungarian,
+        example_kr: raw.example_kr,
+        example_hu: raw.example_hu,
+        root: raw.root || "",
+        stability: Number(raw.stability) || 0,
+        difficulty: Number(raw.difficulty) || 5.0,
+        retrievability: Number(raw.retrievability) || 0,
+        reps: Number(raw.reps) || 0,
+        lapses: Number(raw.lapses) || 0,
+        session_streak: Number(raw.session_streak) || 0,
+        total_correct: Number(raw.total_correct) || 0,
+        total_wrong: Number(raw.total_wrong) || 0,
+        avg_response_ms: Number(raw.avg_response_ms) || 0,
+        last_review_ts: Number(raw.last_review_ts) || 0,
+        next_review_ts: Number(raw.next_review_ts) || 0,
+        status: raw.status || "new"
+      };
+    }
+
+    function calculateRetrievability(word, nowTs = Date.now()) {
+      if (!word.stability || word.stability <= 0 || !word.last_review_ts) return 0;
+      const elapsedDays = Math.max(0, (nowTs - word.last_review_ts) / (1000 * 60 * 60 * 24));
+      return Math.exp(Math.log(0.9) * (elapsedDays / word.stability));
+    }
+
+    function getRootGraphBonus(word) {
+      if (!word.root) return 1.0;
+      const relatedKnown = vocabList.filter(w => w.rank !== word.rank && w.root === word.root && w.reps > 0);
+      return relatedKnown.length > 0 ? 1.25 : 1.0;
+    }
+
+    function updateWordDSR(word, isCorrect, responseTimeMs) {
+      const now = Date.now();
+      word.reps += 1;
+      word.last_review_ts = now;
+
+      if (word.avg_response_ms === 0) {
+        word.avg_response_ms = Math.round(responseTimeMs);
+      } else {
+        word.avg_response_ms = Math.round(word.avg_response_ms * 0.7 + responseTimeMs * 0.3);
+      }
+
+      let speedMultiplier = 1.0;
+      if (isCorrect) {
+        if (responseTimeMs < 2200) speedMultiplier = 1.3;
+        else if (responseTimeMs > 5500) speedMultiplier = 0.8;
+      }
+
+      const rootBonus = getRootGraphBonus(word);
+
+      if (isCorrect) {
+        word.total_correct += 1;
+        word.session_streak += 1;
+
+        const dDelta = responseTimeMs < 2500 ? -0.35 : -0.15;
+        word.difficulty = Math.max(1.0, Math.min(10.0, +(word.difficulty + dDelta).toFixed(2)));
+
+        if (word.stability <= 0) {
+          word.stability = +(1.0 * speedMultiplier * rootBonus).toFixed(2);
+        } else {
+          const difficultyFactor = (11 - word.difficulty) / 5.0;
+          word.stability = +(word.stability * (1.4 + 0.5 * difficultyFactor) * speedMultiplier).toFixed(2);
+        }
+
+        if (word.total_correct >= 3 && word.stability >= 4.0) {
+          word.status = "mastered";
+        } else {
+          word.status = "learning";
+        }
+      } else {
+        word.total_wrong += 1;
+        word.lapses += 1;
+        word.session_streak = 0;
+        word.status = "learning";
+
+        word.difficulty = Math.max(1.0, Math.min(10.0, +(word.difficulty + 0.85).toFixed(2)));
+        word.stability = Math.max(0.2, +(word.stability * 0.2).toFixed(2));
+      }
+
+      word.retrievability = 1.0;
+      word.next_review_ts = now + Math.round(word.stability * 24 * 60 * 60 * 1000);
+    }
+
+    // =========================================================================
+    // 3. PERSISTENCE (LocalStorage Cache + Google Drive Primary Sync)
+    // =========================================================================
+    function loadStateLocal() {
+      const savedVocab = localStorage.getItem(STORAGE_VOCAB_KEY);
+      const savedStatus = localStorage.getItem(STORAGE_STATUS_KEY);
+
+      if (savedVocab) {
+        try {
+          const parsed = JSON.parse(savedVocab);
+          vocabList = parsed.map(createDefaultWordEntry);
+        } catch (e) {
+          vocabList = EMBEDDED_VOCAB.map(createDefaultWordEntry);
+        }
+      } else {
+        vocabList = EMBEDDED_VOCAB.map(createDefaultWordEntry);
+      }
+
+      if (savedStatus) {
+        try {
+          const parsedStatus = JSON.parse(savedStatus);
+          appStatus = { ...appStatus, ...parsedStatus };
+        } catch (e) {}
+      }
+
+      checkCalendarDayRollover();
+      applyTheme();
+      updateVoiceBtnUI();
+    }
+
+    function saveStateLocal() {
+      localStorage.setItem(STORAGE_VOCAB_KEY, JSON.stringify(vocabList));
+      localStorage.setItem(STORAGE_STATUS_KEY, JSON.stringify(appStatus));
+    }
+
+    function checkCalendarDayRollover() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (!Array.isArray(appStatus.studiedDates)) {
+        appStatus.studiedDates = [todayStr];
+      }
+      if (appStatus.lastSessionDate !== todayStr) {
+        if (!appStatus.studiedDates.includes(todayStr)) {
+          appStatus.studiedDates.push(todayStr);
+          appStatus.totalDaysStudied = appStatus.studiedDates.length;
+        }
+        if (appStatus.todayCompletedPrimaryPass) {
+          appStatus.currentDayNumber += 1;
+        }
+        appStatus.lastSessionDate = todayStr;
+        appStatus.todayCompletedPrimaryPass = false;
+        appStatus.todayAskedCount = 0;
+        appStatus.todayCorrectCount = 0;
+        appStatus.todayWrongCount = 0;
+
+        vocabList.forEach(w => w.session_streak = 0);
+        saveStateLocal();
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 3000);
+    }
+
+    // =========================================================================
+    // 4. DAILY CURRICULUM & PHASE ROUTER (Days 1..6 = 10 words/day, Day 7 = 60 review)
+    // =========================================================================
+    function getRequiredStreakForToday() {
+      return appStatus.todayCompletedPrimaryPass ? 1 : 3;
+    }
+
+    function getDayScope() {
+      const dayNum = appStatus.currentDayNumber;
+      const dayOfWeekIndex = ((dayNum - 1) % 7) + 1;
+      const weekIndex = Math.floor((dayNum - 1) / 7);
+
+      if (dayOfWeekIndex < 7) {
+        const startRank = weekIndex * 60 + (dayOfWeekIndex - 1) * 10 + 1;
+        const endRank = Math.min(vocabList.length, startRank + 9);
+        const weekStartRank = weekIndex * 60 + 1;
+        const weekEarlierEndRank = startRank - 1;
+        return {
+          isSunday: false,
+          startRank,
+          endRank,
+          weekStartRank,
+          weekEarlierEndRank,
+          olderEndRank: weekStartRank - 1
+        };
+      } else {
+        const weekStartRank = weekIndex * 60 + 1;
+        const weekEndRank = Math.min(vocabList.length, weekStartRank + 59);
+        return {
+          isSunday: true,
+          startRank: weekStartRank,
+          endRank: weekEndRank,
+          weekStartRank,
+          weekEarlierEndRank: weekEndRank,
+          olderEndRank: weekStartRank - 1
+        };
+      }
+    }
+
+    function selectNextQuestion() {
+      const scope = getDayScope();
+      const reqStreak = getRequiredStreakForToday();
+
+      const phase1Pool = vocabList.filter(w => w.rank >= scope.startRank && w.rank <= scope.endRank);
+      const phase1Incomplete = phase1Pool.filter(w => w.session_streak < reqStreak);
+
+      if (phase1Incomplete.length > 0) {
+        currentPhase = 1;
+        return pickAvoidingRepeat(phase1Incomplete);
+      }
+
+      if (!appStatus.todayCompletedPrimaryPass) {
+        appStatus.todayCompletedPrimaryPass = true;
+        saveStateLocal();
+        showToast("🎉 Napi 10 szó rögzítve! Jöhet az eheti ismétlés.");
+      }
+
+      const phase2Pool = vocabList.filter(w => w.rank >= scope.weekStartRank && w.rank <= scope.weekEarlierEndRank);
+      const phase2Incomplete = phase2Pool.filter(w => w.session_streak < 1);
+
+      if (phase2Incomplete.length > 0) {
+        currentPhase = 2;
+        return pickAvoidingRepeat(phase2Incomplete);
+      }
+
+      currentPhase = 3;
+      const olderPool = vocabList.filter(w => w.rank <= scope.olderEndRank && w.reps > 0);
+      if (olderPool.length > 0) {
+        const now = Date.now();
+        olderPool.sort((a, b) => calculateRetrievability(a, now) - calculateRetrievability(b, now));
+        return pickAvoidingRepeat(olderPool.slice(0, 12));
+      }
+
+      const allActive = vocabList.filter(w => w.rank <= scope.endRank);
+      allActive.sort((a, b) => (a.stability - b.stability) || (b.lapses - a.lapses));
+      return pickAvoidingRepeat(allActive.slice(0, 8));
+    }
+
+    function pickAvoidingRepeat(pool) {
+      if (pool.length === 1) return pool[0];
+      const filtered = pool.filter(w => w.rank !== lastShownRank);
+      const source = filtered.length > 0 ? filtered : pool;
+      return source[Math.floor(Math.random() * source.length)];
+    }
+
+    function generateOptions(targetWord) {
+      const candidates = vocabList.filter(w => w.rank !== targetWord.rank);
+      const shuffled = candidates.sort(() => Math.random() - 0.5);
+      const distractors = shuffled.slice(0, 3);
+      return [targetWord, ...distractors].sort(() => Math.random() - 0.5);
+    }
+
+    // =========================================================================
+    // 5. WEB SPEECH API (TTS)
+    // =========================================================================
+    function speakText(text, lang, onEndCallback = null) {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+
+      const cleanText = text.replace(/\s*\/\s*/g, ", ");
+      const utter = new SpeechSynthesisUtterance(cleanText);
+      utter.lang = lang;
+      utter.rate = lang === "ko-KR" ? 0.92 : 1.0;
+
+      if (onEndCallback) {
+        utter.onend = onEndCallback;
+        utter.onerror = onEndCallback;
+      }
+      window.speechSynthesis.speak(utter);
+    }
+
+    function playQuestionPromptAudio() {
+      if (!currentWord) return;
+      if (!appStatus.settings.koreanVoiceOnly) {
+        speakText(currentWord.hungarian, "hu-HU");
+      }
+    }
+
+    function playAnswerFeedbackAudio(wordObj) {
+      speakText(wordObj.korean, "ko-KR", () => {
+        setTimeout(() => {
+          if (answeredCurrent && currentWord && currentWord.rank === wordObj.rank) {
+            speakText(wordObj.example_kr, "ko-KR");
+          }
+        }, 450);
+      });
+    }
+
+    // =========================================================================
+    // 6. UI RENDERING & INTERACTION HANDLERS
+    // =========================================================================
+    function renderQuestion() {
+      answeredCurrent = false;
+      currentWord = selectNextQuestion();
+      lastShownRank = currentWord.rank;
+      currentOptions = generateOptions(currentWord);
+
+      const scope = getDayScope();
+      const reqStreak = getRequiredStreakForToday();
+
+      document.getElementById("dayBadge").textContent = `${appStatus.currentDayNumber}. NAP`;
+      const phaseNames = {
+        1: scope.isSunday ? "1. Fázis: Heti 60 ismétlés" : "1. Fázis: Napi 10 új",
+        2: "2. Fázis: Eheti ismétlés",
+        3: "3. Fázis: Korábbi SRS"
+      };
+      document.getElementById("phaseBadge").textContent = phaseNames[currentPhase];
+
+      const p1Pool = vocabList.filter(w => w.rank >= scope.startRank && w.rank <= scope.endRank);
+      const p1Done = p1Pool.filter(w => w.session_streak >= reqStreak).length;
+      const pct = p1Pool.length > 0 ? Math.round((p1Done / p1Pool.length) * 100) : 0;
+      document.getElementById("queueInfo").textContent = `Napi cél: ${p1Done} / ${p1Pool.length} szó (${reqStreak}× helyes)`;
+      document.getElementById("scoreInfo").textContent = `Ma: ✅ ${appStatus.todayCorrectCount} | ❌ ${appStatus.todayWrongCount}`;
+      document.getElementById("sessionProgressFill").style.width = `${pct}%`;
+
+      document.getElementById("wordRankTag").textContent = `#${currentWord.rank}`;
+      document.getElementById("huPrompt").textContent = currentWord.hungarian;
+
+      const dotsWrap = document.getElementById("streakDots");
+      dotsWrap.innerHTML = "";
+      const totalDots = currentPhase === 1 ? reqStreak : 1;
+      for (let i = 0; i < totalDots; i++) {
+        const dot = document.createElement("span");
+        dot.className = "dot" + (i < currentWord.session_streak ? " filled" : "");
+        dotsWrap.appendChild(dot);
+      }
+
+      const grid = document.getElementById("optionsGrid");
+      grid.innerHTML = "";
+      currentOptions.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.className = "option-btn";
+        btn.dataset.rank = opt.rank;
+
+        const parts = opt.korean.split("/").map(s => s.trim());
+        if (parts.length > 1) {
+          btn.innerHTML = `<div class="option-kr-main">${parts[0]}</div><div class="option-kr-sub">${parts[1]}</div>`;
+        } else {
+          btn.innerHTML = `<div class="option-kr-main">${parts[0]}</div>`;
+        }
+
+        btn.addEventListener("click", () => handleOptionClick(opt, btn));
+        grid.appendChild(btn);
+      });
+
+      const exBox = document.getElementById("exampleBox");
+      exBox.classList.add("hidden-placeholder");
+      document.getElementById("exampleKr").textContent = "Válassz egy koreai szót fent!";
+      document.getElementById("exampleHu").textContent = "A válasz után megjelenik és megszólal a példamondat.";
+      document.getElementById("ttsHintBadge").style.display = "none";
+
+      const nextBtn = document.getElementById("nextBtn");
+      nextBtn.disabled = true;
+
+      questionStartTime = performance.now();
+      playQuestionPromptAudio();
+    }
+
+    function handleOptionClick(selectedOpt, btnEl) {
+      if (answeredCurrent) {
+        speakText(selectedOpt.korean, "ko-KR");
+        return;
+      }
+
+      answeredCurrent = true;
+      const responseMs = performance.now() - questionStartTime;
+      const isCorrect = selectedOpt.rank === currentWord.rank;
+
+      const allBtns = document.querySelectorAll(".option-btn");
+      allBtns.forEach(b => {
+        const r = Number(b.dataset.rank);
+        if (r === currentWord.rank) {
+          b.classList.add("correct");
+        } else if (r === selectedOpt.rank && !isCorrect) {
+          b.classList.add("wrong");
+        }
+      });
+
+      updateWordDSR(currentWord, isCorrect, responseMs);
+
+      appStatus.todayAskedCount += 1;
+      appStatus.totalAskedCount += 1;
+      if (isCorrect) {
+        appStatus.todayCorrectCount += 1;
+        appStatus.totalCorrectCount += 1;
+      } else {
+        appStatus.todayWrongCount += 1;
+        appStatus.totalWrongCount += 1;
+      }
+
+      saveStateLocal();
+
+      const dots = document.querySelectorAll("#streakDots .dot");
+      dots.forEach((d, idx) => {
+        if (idx < currentWord.session_streak) d.classList.add("filled");
+        else d.classList.remove("filled");
+      });
+
+      const exBox = document.getElementById("exampleBox");
+      exBox.classList.remove("hidden-placeholder");
+      document.getElementById("exampleKr").textContent = currentWord.example_kr;
+      document.getElementById("exampleHu").textContent = currentWord.example_hu;
+      document.getElementById("ttsHintBadge").style.display = "block";
+
+      document.getElementById("scoreInfo").textContent = `Ma: ✅ ${appStatus.todayCorrectCount} | ❌ ${appStatus.todayWrongCount}`;
+      renderDashboard();
+
+      document.getElementById("nextBtn").disabled = false;
+      playAnswerFeedbackAudio(currentWord);
+    }
+
+    // =========================================================================
+    // 7. DASHBOARD RENDERING
+    // =========================================================================
+    function renderDashboard() {
+      const scope = getDayScope();
+      document.getElementById("statDays").textContent = `${appStatus.totalDaysStudied} nap (${appStatus.currentDayNumber}. lecke)`;
+      document.getElementById("statDayScope").textContent = `Aktuális blokk: ${scope.startRank}–${scope.endRank}. szó`;
+
+      document.getElementById("statAsked").textContent = `${appStatus.todayAskedCount} / ${appStatus.totalAskedCount}`;
+
+      const masteredCount = vocabList.filter(w => w.status === "mastered").length;
+      document.getElementById("statMastered").textContent = `${masteredCount} db`;
+      document.getElementById("statTotalVocab").textContent = `${vocabList.length} elérhető szóból`;
+
+      const totalAttempts = appStatus.totalCorrectCount + appStatus.totalWrongCount;
+      const eff = totalAttempts > 0 ? Math.round((appStatus.totalCorrectCount / totalAttempts) * 100) : 0;
+      document.getElementById("statEfficiency").textContent = `${eff}%`;
+
+      const reviewedWords = vocabList.filter(w => w.avg_response_ms > 0);
+      if (reviewedWords.length > 0) {
+        const avgMs = reviewedWords.reduce((acc, w) => acc + w.avg_response_ms, 0) / reviewedWords.length;
+        document.getElementById("statAvgSpeed").textContent = `Átl. válaszidő: ${(avgMs / 1000).toFixed(1)} mp`;
+      }
+
+      const hardListEl = document.getElementById("hardWordsList");
+      const practiced = vocabList.filter(w => w.reps > 0);
+      practiced.sort((a, b) => (b.lapses - a.lapses) || (b.reps - a.reps));
+      const topHard = practiced.slice(0, 6);
+
+      if (topHard.length === 0) {
+        hardListEl.innerHTML = `<div style="font-size:0.82rem; color:var(--text-muted);">Még nincs elég adat. Kezdd el a gyakorlást!</div>`;
+      } else {
+        hardListEl.innerHTML = topHard.map(w => `
+          <div class="hard-item">
+            <div>
+              <span class="hard-item-kr">${w.korean}</span>
+              <span style="color:var(--text-muted); margin-left:6px;">(${w.hungarian})</span>
+            </div>
+            <div style="font-weight:700; font-size:0.78rem;">
+              🔁 ${w.reps}× | ❌ ${w.lapses}
+            </div>
+          </div>
+        `).join("");
+      }
+    }
+
+    // =========================================================================
+    // 8. CSV & JSON SERIALIZATION + DRIVE OVERWRITE & LOCAL BACKUP
+    // =========================================================================
+    function buildVocabCSVString() {
+      const headers = [
+        "rank", "korean", "hungarian", "example_kr", "example_hu", "root",
+        "stability", "difficulty", "retrievability", "reps", "lapses",
+        "session_streak", "total_correct", "total_wrong", "avg_response_ms",
+        "last_review_ts", "next_review_ts", "status"
+      ];
+      const rows = [headers.join(";")];
+      vocabList.forEach(w => {
+        const row = headers.map(h => {
+          let val = w[h] !== undefined ? String(w[h]) : "";
+          if (val.includes(";") || val.includes('"') || val.includes("\n")) {
+            val = '"' + val.replace(/"/g, '""') + '"';
+          }
+          return val;
+        });
+        rows.push(row.join(";"));
+      });
+      return "\uFEFF" + rows.join("\n");
+    }
+
+    async function saveVocabToDriveAndLocal() {
+      const csvContent = buildVocabCSVString();
+
+      // Always save local download backup
+      const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      downloadBlob(csvBlob, "koreai_1000_szokincs_srs.csv");
+
+      if (!hasValidToken()) {
+        requestGoogleAuth(true, saveVocabToDriveAndLocal);
+        return;
+      }
+
+      updateDriveStatusUI("⏳ Szókincsfájl felülírása a Google Drive-on...", "badge-pending");
+      try {
+        const updatedMeta = await overwriteDriveFile(
+          DRIVE_VOCAB_FILE_ID,
+          csvContent,
+          "text/csv; charset=utf-8"
+        );
+        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(updatedMeta.modifiedTime);
+        updateDriveStatusUI("✅ Szókincsfájl sikeresen mentve a Drive-ra!", "badge-ok");
+        showToast("✅ Szókincsfájl sikeresen felülírva a Google Drive-on!");
+      } catch (err) {
+        console.error("Drive CSV save error:", err);
+        updateDriveStatusUI("❌ Hiba a szókincsfájl Drive mentésekor", "badge-err");
+        showToast("❌ Sikertelen Drive mentés (helyi CSV letöltve).");
+      }
+    }
+
+    async function saveStatusToDriveAndLocal() {
+      const jsonContent = JSON.stringify(appStatus, null, 2);
+
+      // Always save local download backup
+      const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+      downloadBlob(blob, "tanulasi_statusz.json");
+
+      if (!hasValidToken()) {
+        requestGoogleAuth(true, saveStatusToDriveAndLocal);
+        return;
+      }
+
+      updateDriveStatusUI("⏳ Státuszfájl felülírása a Google Drive-on...", "badge-pending");
+      try {
+        const updatedMeta = await overwriteDriveFile(
+          DRIVE_STATUS_FILE_ID,
+          jsonContent,
+          "application/json; charset=utf-8"
+        );
+        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(updatedMeta.modifiedTime);
+        updateDriveStatusUI("✅ Státuszfájl sikeresen mentve a Drive-ra!", "badge-ok");
+        showToast("✅ Státuszfájl sikeresen felülírva a Google Drive-on!");
+      } catch (err) {
+        console.error("Drive JSON save error:", err);
+        updateDriveStatusUI("❌ Hiba a státuszfájl Drive mentésekor", "badge-err");
+        showToast("❌ Sikertelen Drive mentés (helyi JSON letöltve).");
+      }
+    }
+
+    function parseSemicolonCSV(text) {
+      const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(";").map(h => h.trim().replace(/^"|"$/g, ""));
+      const result = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = [];
+        let cur = "";
+        let inQuotes = false;
+        for (let c = 0; c < lines[i].length; c++) {
+          const ch = lines[i][c];
+          if (ch === '"') {
+            if (inQuotes && lines[i][c + 1] === '"') {
+              cur += '"';
+              c++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ";" && !inQuotes) {
+            cols.push(cur);
+            cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+        cols.push(cur);
+
+        const obj = {};
+        headers.forEach((h, idx) => {
+          obj[h] = cols[idx] !== undefined ? cols[idx].trim() : "";
+        });
+        if (obj.korean && obj.hungarian) {
+          if (!obj.rank) obj.rank = i;
+          result.push(createDefaultWordEntry(obj));
+        }
+      }
+      return result;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================================
+    // 9. THEME, VOICE & EVENT LISTENERS
+    // =========================================================================
+    function applyTheme() {
+      const html = document.documentElement;
+      const btn = document.getElementById("themeToggleBtn");
+      if (appStatus.settings.darkMode) {
+        html.classList.add("dark");
+        btn.textContent = "🌙";
+      } else {
+        html.classList.remove("dark");
+        btn.textContent = "☀️";
+      }
+    }
+
+    function updateVoiceBtnUI() {
+      const btn = document.getElementById("voiceToggleBtn");
+      const label = document.getElementById("voiceToggleLabel");
+      if (appStatus.settings.koreanVoiceOnly) {
+        btn.classList.add("active");
+        label.textContent = "Csak KR";
+      } else {
+        btn.classList.remove("active");
+        label.textContent = "HU+KR";
+      }
+    }
+
+    document.getElementById("googleAuthBtn").addEventListener("click", () => {
+      requestGoogleAuth(true, loadAllFromGoogleDrive);
+    });
+
+    document.getElementById("reloadDriveBtn").addEventListener("click", () => {
+      loadAllFromGoogleDrive();
+    });
+
+    document.getElementById("questionCard").addEventListener("click", () => {
+      if (currentWord) speakText(currentWord.hungarian, "hu-HU");
+    });
+
+    document.getElementById("exampleBox").addEventListener("click", () => {
+      if (answeredCurrent && currentWord) {
+        speakText(currentWord.example_kr, "ko-KR");
+      }
+    });
+
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      renderQuestion();
+    });
+
+    document.getElementById("voiceToggleBtn").addEventListener("click", () => {
+      appStatus.settings.koreanVoiceOnly = !appStatus.settings.koreanVoiceOnly;
+      updateVoiceBtnUI();
+      saveStateLocal();
+      showToast(appStatus.settings.koreanVoiceOnly ? "🔇 Csak koreai hang aktív" : "🔊 Magyar + Koreai hang aktív");
+    });
+
+    document.getElementById("themeToggleBtn").addEventListener("click", () => {
+      appStatus.settings.darkMode = !appStatus.settings.darkMode;
+      applyTheme();
+      saveStateLocal();
+    });
+
+    document.getElementById("advanceDayBtn").addEventListener("click", () => {
+      appStatus.currentDayNumber += 1;
+      appStatus.todayCompletedPrimaryPass = false;
+      vocabList.forEach(w => w.session_streak = 0);
+      saveStateLocal();
+      renderDashboard();
+      renderQuestion();
+      showToast(`📅 ${appStatus.currentDayNumber}. tanulási nap elindítva!`);
+    });
+
+    document.getElementById("exportCsvBtn").addEventListener("click", saveVocabToDriveAndLocal);
+    document.getElementById("exportStatusBtn").addEventListener("click", saveStatusToDriveAndLocal);
+
+    document.getElementById("importCsvInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const parsed = parseSemicolonCSV(ev.target.result);
+        if (parsed.length > 0) {
+          vocabList = parsed;
+          saveStateLocal();
+          renderDashboard();
+          renderQuestion();
+          showToast(`✅ ${parsed.length} szó betöltve a helyi CSV fájlból!`);
+        } else {
+          showToast("❌ Nem sikerült beolvasni a CSV fájlt.");
+        }
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+
+    document.getElementById("importStatusInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          appStatus = { ...appStatus, ...imported };
+          applyTheme();
+          updateVoiceBtnUI();
+          saveStateLocal();
+          renderDashboard();
+          renderQuestion();
+          showToast("✅ Tanulási státusz betöltve a helyi JSON fájlból!");
+        } catch (err) {
+          showToast("❌ Hibás JSON státusz fájl.");
+        }
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+
+    // Boot Application
+    loadStateLocal();
+    renderDashboard();
+    renderQuestion();
+    window.addEventListener("load", initGoogleIdentityServices);
+  </script>
+</body>
+</html>

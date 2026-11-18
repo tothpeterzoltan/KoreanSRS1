@@ -641,9 +641,14 @@
     <div class="dashboard-section">
       <div class="section-title">
         <span>📊 Tanulási Statisztika &amp; SRS Dashboard</span>
-        <button class="icon-btn" id="advanceDayBtn" title="Következő tanulási nap indítása (következő 10 szó)">
-          ⏭️ Következő nap
-        </button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="icon-btn" id="prevDayBtn" title="Előző tanulási napra lépés (előző 10 szó)">
+            ⏮️ Előző nap
+          </button>
+          <button class="icon-btn" id="advanceDayBtn" title="Következő tanulási nap indítása (következő 10 szó)">
+            ⏭️ Következő nap
+          </button>
+        </div>
       </div>
 
       <div class="stats-grid">
@@ -1066,7 +1071,7 @@
         avg_response_ms: Math.max(0, Number(raw.avg_response_ms) || 0),
         last_review_ts: Math.max(0, Number(raw.last_review_ts) || 0),
         next_review_ts: Math.max(0, Number(raw.next_review_ts) || 0),
-        status: raw.status || "new"
+        status: String(raw.status || "new").replace(/,+$/, "").trim() || "new"
       };
     }
 
@@ -1272,8 +1277,11 @@
       const olderPool = vocabList.filter(w => w.rank <= scope.olderEndRank && w.reps > 0);
       if (olderPool.length > 0) {
         const now = Date.now();
-        olderPool.sort((a, b) => calculateRetrievability(a, now) - calculateRetrievability(b, now));
-        const topDue = olderPool.slice(0, 12);
+        // Szűrés: elsősorban azokat a szavakat kérdezzük újra, amelyeknél az előhívhatóság R(t) < 0.90 (azaz lejárt a next_review_ts)
+        const dueOlder = olderPool.filter(w => calculateRetrievability(w, now) < 0.90 || now >= w.next_review_ts);
+        const candidateOlder = dueOlder.length > 0 ? dueOlder : olderPool;
+        candidateOlder.sort((a, b) => calculateRetrievability(a, now) - calculateRetrievability(b, now));
+        const topDue = candidateOlder.slice(0, 12);
         const interleavePool = vocabList.filter(w => w.rank <= scope.endRank && getWordKey(w) !== lastShownWordKey);
         return pickWithMaxConsecutiveLimit(topDue, interleavePool);
       }
@@ -1491,6 +1499,11 @@
     // =========================================================================
     function renderDashboard() {
       const scope = getDayScope();
+      const prevBtn = document.getElementById("prevDayBtn");
+      if (prevBtn) {
+        prevBtn.disabled = appStatus.currentDayNumber <= 1;
+        prevBtn.style.opacity = appStatus.currentDayNumber <= 1 ? "0.45" : "1";
+      }
       document.getElementById("statDays").textContent = `${appStatus.totalDaysStudied} nap (${appStatus.currentDayNumber}. lecke)`;
       document.getElementById("statDayScope").textContent = `Aktuális blokk: ${scope.startRank}–${scope.endRank}. szó`;
 
@@ -1620,7 +1633,7 @@
       const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim().length > 0);
       if (lines.length < 2) return [];
       const delim = (lines[0].split(";").length >= 3) ? ";" : ",";
-      const headers = lines[0].split(delim).map(h => h.trim().replace(/^"|"$/g, ""));
+      const headers = lines[0].split(delim).map(h => h.trim().replace(/^"|"$/g, "").replace(/,+$/, ""));
       const result = [];
 
       for (let i = 1; i < lines.length; i++) {
@@ -1729,11 +1742,31 @@
       saveStateLocal();
     });
 
+    document.getElementById("prevDayBtn").addEventListener("click", () => {
+      if (appStatus.currentDayNumber <= 1) {
+        showToast("⚠️ Már az 1. tanulási napon vagy!");
+        return;
+      }
+      appStatus.currentDayNumber -= 1;
+      appStatus.todayCompletedPrimaryPass = false;
+      lastShownWordKey = "";
+      consecutiveSameWordCount = 0;
+      vocabList.forEach(w => w.session_streak = 0);
+      saveStateLocal();
+      silentAutoSyncBothToDrive();
+      renderDashboard();
+      renderQuestion();
+      showToast(`📅 Visszaléptél a(z) ${appStatus.currentDayNumber}. tanulási napra!`);
+    });
+
     document.getElementById("advanceDayBtn").addEventListener("click", () => {
       appStatus.currentDayNumber += 1;
       appStatus.todayCompletedPrimaryPass = false;
+      lastShownWordKey = "";
+      consecutiveSameWordCount = 0;
       vocabList.forEach(w => w.session_streak = 0);
       saveStateLocal();
+      silentAutoSyncBothToDrive();
       renderDashboard();
       renderQuestion();
       showToast(`📅 ${appStatus.currentDayNumber}. tanulási nap elindítva!`);

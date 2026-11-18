@@ -952,13 +952,22 @@
       return await res.json();
     }
 
+    let isDriveSyncInProgress = false;
+    let pendingQueuedDriveSync = false;
+
     async function silentAutoSyncBothToDrive() {
       if (!hasValidToken()) {
-        updateDriveStatusUI("⚠️ Auto-mentés várakozik (nincs aktív Drive token)", "badge-pending");
+        updateDriveStatusUI("⚠️ Auto-mentés várakozik (kattints a 'Drive Belépés' gombra!)", "badge-pending");
         return;
       }
 
-      updateDriveStatusUI("⏳ Mentés a Google Drive-ra...", "badge-pending");
+      if (isDriveSyncInProgress) {
+        pendingQueuedDriveSync = true;
+        return;
+      }
+
+      isDriveSyncInProgress = true;
+      updateDriveStatusUI("⏳ Azonnali mentés a Google Drive-ra...", "badge-pending");
       try {
         const csvContent = buildVocabCSVString();
         const jsonContent = JSON.stringify(appStatus, null, 2);
@@ -975,7 +984,13 @@
         updateDriveStatusUI(`✅ Drive mentés kész (${formatHuDateTime(statusMeta.modifiedTime)})`, "badge-ok");
       } catch (err) {
         console.error("Silent auto-sync error:", err);
-        updateDriveStatusUI("❌ Automatikus Drive mentés sikertelen", "badge-err");
+        updateDriveStatusUI(`❌ Drive mentés hiba: ${err.message}`, "badge-err");
+      } finally {
+        isDriveSyncInProgress = false;
+        if (pendingQueuedDriveSync) {
+          pendingQueuedDriveSync = false;
+          silentAutoSyncBothToDrive();
+        }
       }
     }
 
@@ -1402,6 +1417,13 @@
       }
 
       saveStateLocal();
+
+      // Immediate background sync to Google Drive after every answered word
+      answersSinceLastDriveSync += 1;
+      if (answersSinceLastDriveSync >= AUTO_SYNC_INTERVAL) {
+        answersSinceLastDriveSync = 0;
+        silentAutoSyncBothToDrive();
+      }
 
       const dots = document.querySelectorAll("#streakDots .dot");
       dots.forEach((d, idx) => {

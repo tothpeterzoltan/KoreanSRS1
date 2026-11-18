@@ -798,7 +798,7 @@
               const action = pendingActionAfterAuth;
               pendingActionAfterAuth = null;
               await action();
-            } else {
+            } else if (!hasInitialDriveLoaded) {
               await loadAllFromGoogleDrive();
             }
           } else {
@@ -923,6 +923,10 @@
       renderDashboard();
       renderQuestion();
 
+      if (vocabLoadedOk || statusLoadedOk) {
+        hasInitialDriveLoaded = true;
+      }
+
       if (vocabLoadedOk && statusLoadedOk) {
         updateDriveStatusUI(`✅ Sikeres betöltés (${vocabList.length} szó + státusz)`, "badge-ok");
         showToast(`✅ Google Drive betöltve! (${vocabList.length} szó)`);
@@ -1031,27 +1035,37 @@
     let currentOptions = [];
     let questionStartTime = 0;
     let answeredCurrent = false;
-    let lastShownRank = -1;
+    let lastShownWordKey = "";
+    let consecutiveSameWordCount = 0;
+    const MAX_CONSECUTIVE_SAME_WORD = 2;
+    let hasInitialDriveLoaded = false;
 
-    function createDefaultWordEntry(raw) {
+    function getWordKey(w) {
+      if (!w) return "";
+      return `${w.rank}::${w.korean}`;
+    }
+
+    function createDefaultWordEntry(raw, fallbackRank = 1) {
+      const parsedRank = Number(raw.rank);
+      const validRank = (!isNaN(parsedRank) && parsedRank > 0) ? parsedRank : fallbackRank;
       return {
-        rank: Number(raw.rank),
-        korean: raw.korean,
-        hungarian: raw.hungarian,
-        example_kr: raw.example_kr,
-        example_hu: raw.example_hu,
-        root: raw.root || "",
-        stability: Number(raw.stability) || 0,
-        difficulty: Number(raw.difficulty) || 5.0,
-        retrievability: Number(raw.retrievability) || 0,
-        reps: Number(raw.reps) || 0,
-        lapses: Number(raw.lapses) || 0,
-        session_streak: Number(raw.session_streak) || 0,
-        total_correct: Number(raw.total_correct) || 0,
-        total_wrong: Number(raw.total_wrong) || 0,
-        avg_response_ms: Number(raw.avg_response_ms) || 0,
-        last_review_ts: Number(raw.last_review_ts) || 0,
-        next_review_ts: Number(raw.next_review_ts) || 0,
+        rank: validRank,
+        korean: String(raw.korean || "").trim(),
+        hungarian: String(raw.hungarian || "").trim(),
+        example_kr: String(raw.example_kr || "").trim(),
+        example_hu: String(raw.example_hu || "").trim(),
+        root: String(raw.root || "").trim(),
+        stability: Math.max(0, Number(raw.stability) || 0),
+        difficulty: Math.min(10, Math.max(1, Number(raw.difficulty) || 5.0)),
+        retrievability: Math.max(0, Number(raw.retrievability) || 0),
+        reps: Math.max(0, Number(raw.reps) || 0),
+        lapses: Math.max(0, Number(raw.lapses) || 0),
+        session_streak: Math.max(0, Number(raw.session_streak) || 0),
+        total_correct: Math.max(0, Number(raw.total_correct) || 0),
+        total_wrong: Math.max(0, Number(raw.total_wrong) || 0),
+        avg_response_ms: Math.max(0, Number(raw.avg_response_ms) || 0),
+        last_review_ts: Math.max(0, Number(raw.last_review_ts) || 0),
+        next_review_ts: Math.max(0, Number(raw.next_review_ts) || 0),
         status: raw.status || "new"
       };
     }
@@ -1130,12 +1144,12 @@
       if (savedVocab) {
         try {
           const parsed = JSON.parse(savedVocab);
-          vocabList = parsed.map(createDefaultWordEntry);
+          vocabList = parsed.map((item, idx) => createDefaultWordEntry(item, idx + 1));
         } catch (e) {
-          vocabList = EMBEDDED_VOCAB.map(createDefaultWordEntry);
+          vocabList = EMBEDDED_VOCAB.map((item, idx) => createDefaultWordEntry(item, idx + 1));
         }
       } else {
-        vocabList = EMBEDDED_VOCAB.map(createDefaultWordEntry);
+        vocabList = EMBEDDED_VOCAB.map((item, idx) => createDefaultWordEntry(item, idx + 1));
       }
 
       if (savedStatus) {
@@ -1234,7 +1248,9 @@
 
       if (phase1Incomplete.length > 0) {
         currentPhase = 1;
-        return pickAvoidingRepeat(phase1Incomplete);
+        // Interleaving pool: other words from today's 10 words or earlier learned words so we NEVER ask the same word > 2 times in a row
+        const interleavePool = vocabList.filter(w => w.rank <= scope.endRank && getWordKey(w) !== lastShownWordKey);
+        return pickWithMaxConsecutiveLimit(phase1Incomplete, interleavePool);
       }
 
       if (!appStatus.todayCompletedPrimaryPass) {
@@ -1248,7 +1264,8 @@
 
       if (phase2Incomplete.length > 0) {
         currentPhase = 2;
-        return pickAvoidingRepeat(phase2Incomplete);
+        const interleavePool = vocabList.filter(w => w.rank <= scope.endRank && getWordKey(w) !== lastShownWordKey);
+        return pickWithMaxConsecutiveLimit(phase2Incomplete, interleavePool);
       }
 
       currentPhase = 3;
@@ -1256,19 +1273,38 @@
       if (olderPool.length > 0) {
         const now = Date.now();
         olderPool.sort((a, b) => calculateRetrievability(a, now) - calculateRetrievability(b, now));
-        return pickAvoidingRepeat(olderPool.slice(0, 12));
+        const topDue = olderPool.slice(0, 12);
+        const interleavePool = vocabList.filter(w => w.rank <= scope.endRank && getWordKey(w) !== lastShownWordKey);
+        return pickWithMaxConsecutiveLimit(topDue, interleavePool);
       }
 
       const allActive = vocabList.filter(w => w.rank <= scope.endRank);
       allActive.sort((a, b) => (a.stability - b.stability) || (b.lapses - a.lapses));
-      return pickAvoidingRepeat(allActive.slice(0, 8));
+      const fallbackPool = allActive.slice(0, Math.min(10, allActive.length));
+      const interleavePool = vocabList.filter(w => getWordKey(w) !== lastShownWordKey);
+      return pickWithMaxConsecutiveLimit(fallbackPool.length > 0 ? fallbackPool : vocabList, interleavePool);
     }
 
-    function pickAvoidingRepeat(pool) {
-      if (pool.length === 1) return pool[0];
-      const filtered = pool.filter(w => w.rank !== lastShownRank);
-      const source = filtered.length > 0 ? filtered : pool;
-      return source[Math.floor(Math.random() * source.length)];
+    function pickWithMaxConsecutiveLimit(primaryPool, fallbackInterleavePool) {
+      if (!primaryPool || primaryPool.length === 0) {
+        return vocabList[0];
+      }
+
+      // First try to pick a DIFFERENT word from the primaryPool so we don't even repeat once if alternatives exist
+      const differentInPrimary = primaryPool.filter(w => getWordKey(w) !== lastShownWordKey);
+      if (differentInPrimary.length > 0) {
+        return differentInPrimary[Math.floor(Math.random() * differentInPrimary.length)];
+      }
+
+      // Only 1 unique word exists in primaryPool (it is the same as lastShownWordKey).
+      // Check if we already asked it MAX_CONSECUTIVE_SAME_WORD (2) times in a row!
+      if (consecutiveSameWordCount >= MAX_CONSECUTIVE_SAME_WORD) {
+        if (fallbackInterleavePool && fallbackInterleavePool.length > 0) {
+          return fallbackInterleavePool[Math.floor(Math.random() * fallbackInterleavePool.length)];
+        }
+      }
+
+      return primaryPool[0];
     }
 
     function generateOptions(targetWord) {
@@ -1320,7 +1356,13 @@
     function renderQuestion() {
       answeredCurrent = false;
       currentWord = selectNextQuestion();
-      lastShownRank = currentWord.rank;
+      const selectedKey = getWordKey(currentWord);
+      if (selectedKey === lastShownWordKey) {
+        consecutiveSameWordCount += 1;
+      } else {
+        lastShownWordKey = selectedKey;
+        consecutiveSameWordCount = 1;
+      }
       currentOptions = generateOptions(currentWord);
 
       const scope = getDayScope();
@@ -1577,7 +1619,8 @@
     function parseSemicolonCSV(text) {
       const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim().length > 0);
       if (lines.length < 2) return [];
-      const headers = lines[0].split(";").map(h => h.trim().replace(/^"|"$/g, ""));
+      const delim = (lines[0].split(";").length >= 3) ? ";" : ",";
+      const headers = lines[0].split(delim).map(h => h.trim().replace(/^"|"$/g, ""));
       const result = [];
 
       for (let i = 1; i < lines.length; i++) {
@@ -1593,7 +1636,7 @@
             } else {
               inQuotes = !inQuotes;
             }
-          } else if (ch === ";" && !inQuotes) {
+          } else if (ch === delim && !inQuotes) {
             cols.push(cur);
             cur = "";
           } else {
@@ -1607,8 +1650,7 @@
           obj[h] = cols[idx] !== undefined ? cols[idx].trim() : "";
         });
         if (obj.korean && obj.hungarian) {
-          if (!obj.rank) obj.rank = i;
-          result.push(createDefaultWordEntry(obj));
+          result.push(createDefaultWordEntry(obj, i));
         }
       }
       return result;

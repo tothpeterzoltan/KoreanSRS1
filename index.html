@@ -263,8 +263,8 @@
       background: var(--surface);
       border: 2px solid var(--border);
       border-radius: 16px;
-      padding: 12px 8px;
-      min-height: 82px;
+      padding: 15px 10px;
+      min-height: 103px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -283,7 +283,7 @@
     /* Korean words in 3x relative visual prominence with highlighted accent color */
     .option-kr-main {
       font-family: 'Noto Sans KR', sans-serif;
-      font-size: clamp(1.45rem, 5.2vw, 2.1rem);
+      font-size: clamp(1.81rem, 6.5vw, 2.63rem);
       font-weight: 900;
       color: var(--korean-accent);
       line-height: 1.15;
@@ -292,7 +292,7 @@
 
     .option-kr-sub {
       font-family: 'Noto Sans KR', sans-serif;
-      font-size: clamp(1.05rem, 3.6vw, 1.35rem);
+      font-size: clamp(1.31rem, 4.5vw, 1.69rem);
       font-weight: 700;
       color: var(--korean-accent);
       opacity: 0.88;
@@ -343,7 +343,7 @@
 
     .example-kr {
       font-family: 'Noto Sans KR', sans-serif;
-      font-size: clamp(1.25rem, 4.4vw, 1.65rem); /* 2x relative to 1x Hungarian */
+      font-size: clamp(1.56rem, 5.5vw, 2.06rem); /* +25% megnövelt méret */
       font-weight: 700;
       color: var(--text);
       line-height: 1.35;
@@ -364,12 +364,13 @@
     /* Next Button */
     .next-btn {
       width: 100%;
-      padding: 13px 18px;
-      border-radius: 14px;
+      padding: 26px 18px;
+      min-height: 78px;
+      border-radius: 16px;
       border: none;
       background: var(--primary);
       color: #fff;
-      font-size: 1rem;
+      font-size: 1.15rem;
       font-weight: 800;
       cursor: pointer;
       box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
@@ -692,18 +693,28 @@
             <span class="drive-status-label">Szinkron állapot:</span>
             <span class="drive-status-val badge-pending" id="driveSyncState">Várakozás Google hitelesítésre...</span>
           </div>
+          <hr style="border:none; border-top:1px solid var(--border); margin:3px 0;">
           <div class="drive-status-row">
-            <span class="drive-status-label">Szókincsfájl (CSV) utolsó módosítása:</span>
-            <span class="drive-status-val" id="vocabModifiedTime">-</span>
+            <span class="drive-status-label">📥 Betöltött szókincsfájl:</span>
+            <span class="drive-status-val" id="loadedVocabInfo">-</span>
           </div>
           <div class="drive-status-row">
-            <span class="drive-status-label">Státuszfájl (JSON) utolsó módosítása:</span>
-            <span class="drive-status-val" id="statusModifiedTime">-</span>
+            <span class="drive-status-label">📥 Betöltött státuszfájl:</span>
+            <span class="drive-status-val" id="loadedStatusInfo">-</span>
+          </div>
+          <hr style="border:none; border-top:1px solid var(--border); margin:3px 0;">
+          <div class="drive-status-row">
+            <span class="drive-status-label">💾 Kimentett szókincsfájl:</span>
+            <span class="drive-status-val" id="savedVocabInfo">-</span>
+          </div>
+          <div class="drive-status-row">
+            <span class="drive-status-label">💾 Kimentett státuszfájl:</span>
+            <span class="drive-status-val" id="savedStatusInfo">-</span>
           </div>
         </div>
 
         <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-          A program <strong>minden 10. válasz után automatikusan</strong> felülírja mindkét fájlt a Google Drive-on. A lenti gombokkal bármikor manuálisan is elindíthatod a mentést (helyi biztonsági másolattal együtt).
+          A program <strong>minden egyes szó kikérdezése után automatikusan</strong> felülírja mindkét fájlt a Google Drive-on. A lenti gombokkal bármikor manuálisan is elindíthatod a mentést (helyi biztonsági másolattal együtt).
         </p>
 
         <div class="file-actions">
@@ -736,7 +747,7 @@
     let tokenExpiresAt = 0;
     let pendingActionAfterAuth = null;
     let answersSinceLastDriveSync = 0;
-    const AUTO_SYNC_INTERVAL = 10;
+    const AUTO_SYNC_INTERVAL = 1;
 
     function formatHuDateTime(isoString) {
       if (!isoString) return "Ismeretlen";
@@ -869,7 +880,8 @@
           fetchDriveFileMetadata(DRIVE_VOCAB_FILE_ID),
           fetchDriveFileMedia(DRIVE_VOCAB_FILE_ID)
         ]);
-        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(vocabMeta.modifiedTime);
+        const vName = vocabMeta.name || "koreai_1000_szokincs_srs.csv";
+        document.getElementById("loadedVocabInfo").textContent = `${vName} (${formatHuDateTime(vocabMeta.modifiedTime)})`;
 
         const parsed = parseSemicolonCSV(vocabCsvText);
         if (parsed.length > 0) {
@@ -878,7 +890,7 @@
         }
       } catch (err) {
         console.error("Vocab Drive load error:", err);
-        document.getElementById("vocabModifiedTime").textContent = "❌ Betöltési hiba";
+        document.getElementById("loadedVocabInfo").textContent = "❌ Betöltési hiba";
       }
 
       // 2. Load Status JSON from Google Drive
@@ -887,7 +899,8 @@
           fetchDriveFileMetadata(DRIVE_STATUS_FILE_ID),
           fetchDriveFileMedia(DRIVE_STATUS_FILE_ID)
         ]);
-        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(statusMeta.modifiedTime);
+        const sName = statusMeta.name || "tanulasi_statusz.json";
+        document.getElementById("loadedStatusInfo").textContent = `${sName} (${formatHuDateTime(statusMeta.modifiedTime)})`;
 
         if (statusJsonText && statusJsonText.trim().length > 2) {
           const parsedStatus = JSON.parse(statusJsonText);
@@ -900,19 +913,13 @@
         }
       } catch (err) {
         console.error("Status Drive load error:", err);
-        document.getElementById("statusModifiedTime").textContent = "❌ Betöltési hiba / üres fájl";
+        document.getElementById("loadedStatusInfo").textContent = "❌ Betöltési hiba / üres fájl";
       }
 
       checkCalendarDayRollover();
       applyTheme();
       updateVoiceBtnUI();
       saveStateLocal();
-
-      answersSinceLastDriveSync += 1;
-      if (answersSinceLastDriveSync >= AUTO_SYNC_INTERVAL) {
-        answersSinceLastDriveSync = 0;
-        silentAutoSyncBothToDrive();
-      }
       renderDashboard();
       renderQuestion();
 
@@ -951,7 +958,7 @@
         return;
       }
 
-      updateDriveStatusUI("⏳ Automatikus Drive mentés (10 válasz után)...", "badge-pending");
+      updateDriveStatusUI("⏳ Mentés a Google Drive-ra...", "badge-pending");
       try {
         const csvContent = buildVocabCSVString();
         const jsonContent = JSON.stringify(appStatus, null, 2);
@@ -961,10 +968,11 @@
           overwriteDriveFile(DRIVE_STATUS_FILE_ID, jsonContent, "application/json; charset=utf-8")
         ]);
 
-        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(vocabMeta.modifiedTime);
-        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(statusMeta.modifiedTime);
-        updateDriveStatusUI(`✅ Automatikusan szinkronizálva (${formatHuDateTime(statusMeta.modifiedTime)})`, "badge-ok");
-        showToast("☁️ Automatikus mentés a Google Drive-ra kész (10 válasz)!");
+        const vName = vocabMeta.name || "koreai_1000_szokincs_srs.csv";
+        const sName = statusMeta.name || "tanulasi_statusz.json";
+        document.getElementById("savedVocabInfo").textContent = `${vName} (${formatHuDateTime(vocabMeta.modifiedTime)})`;
+        document.getElementById("savedStatusInfo").textContent = `${sName} (${formatHuDateTime(statusMeta.modifiedTime)})`;
+        updateDriveStatusUI(`✅ Drive mentés kész (${formatHuDateTime(statusMeta.modifiedTime)})`, "badge-ok");
       } catch (err) {
         console.error("Silent auto-sync error:", err);
         updateDriveStatusUI("❌ Automatikus Drive mentés sikertelen", "badge-err");
@@ -1503,7 +1511,8 @@
           csvContent,
           "text/csv; charset=utf-8"
         );
-        document.getElementById("vocabModifiedTime").textContent = formatHuDateTime(updatedMeta.modifiedTime);
+        const vName = updatedMeta.name || "koreai_1000_szokincs_srs.csv";
+        document.getElementById("savedVocabInfo").textContent = `${vName} (${formatHuDateTime(updatedMeta.modifiedTime)})`;
         updateDriveStatusUI("✅ Szókincsfájl sikeresen mentve a Drive-ra!", "badge-ok");
         showToast("✅ Szókincsfájl sikeresen felülírva a Google Drive-on!");
       } catch (err) {
@@ -1532,7 +1541,8 @@
           jsonContent,
           "application/json; charset=utf-8"
         );
-        document.getElementById("statusModifiedTime").textContent = formatHuDateTime(updatedMeta.modifiedTime);
+        const sName = updatedMeta.name || "tanulasi_statusz.json";
+        document.getElementById("savedStatusInfo").textContent = `${sName} (${formatHuDateTime(updatedMeta.modifiedTime)})`;
         updateDriveStatusUI("✅ Státuszfájl sikeresen mentve a Drive-ra!", "badge-ok");
         showToast("✅ Státuszfájl sikeresen felülírva a Google Drive-on!");
       } catch (err) {
@@ -1679,6 +1689,7 @@
           saveStateLocal();
           renderDashboard();
           renderQuestion();
+          document.getElementById("loadedVocabInfo").textContent = `${file.name} (Helyi: ${formatHuDateTime(new Date().toISOString())})`;
           showToast(`✅ ${parsed.length} szó betöltve a helyi CSV fájlból!`);
         } else {
           showToast("❌ Nem sikerült beolvasni a CSV fájlt.");
@@ -1700,6 +1711,7 @@
           saveStateLocal();
           renderDashboard();
           renderQuestion();
+          document.getElementById("loadedStatusInfo").textContent = `${file.name} (Helyi: ${formatHuDateTime(new Date().toISOString())})`;
           showToast("✅ Tanulási státusz betöltve a helyi JSON fájlból!");
         } catch (err) {
           showToast("❌ Hibás JSON státusz fájl.");
